@@ -1,0 +1,139 @@
+#+PROPERTY: like 1 2 3 4 5
+#+PROPERTY: link
+#+PROPERTY: index
+
+* Language Understanding for Text-based Games using Deep Reinforcement Learning
+  :PROPERTIES:
+  :index: 1
+  :link: http://people.csail.mit.edu/regina/my_papers/TG15.pdf
+  :like: 1
+  :END:
+  
+  + text-based
+  + bag-of-words/bag-of-biagrams
+  + deep reinforcement
+  + states
+
+* Language to Logical Form with Neural Attention
+  :PROPERTIES:
+  :index: 2
+  :link: https://arxiv.org/pdf/1601.01280v2.pdf
+  :like: 3
+  :END:
+
+  + machine translation
+  + okay but not sure
+
+* Improving Neural Machine Translation Models with Monolingual Data
+  :PROPERTIES:
+  :index: 3
+  :link: http://arxiv.org/pdf/1511.06709v4.pdf
+  :like: 4
+  :END:
+  
+  + machine translation
+  + monolingual data? tam anlamadim
+
+* Distilling the Knowledge in a Neural Network
+  :PROPERTIES:
+  :index: 4
+  :link: http://arxiv.org/pdf/1503.02531v1.pdf
+  :like: 2
+  :END:
+
+* Pointer Networks
+  :PROPERTIES:
+  :index: 5
+  :link: http://arxiv.org/pdf/1506.03134v1.pdf
+  :like: 1
+  :END:
+
+  + interesting
+  + convex hull, TSP vs.
+
+* A Neural Conversational Model
+  :PROPERTIES:
+  :index: 6
+  :link: http://arxiv.org/abs/1506.05869
+  :like: 1
+  :END:
+
+  + awesome!
+  + konusmalari tahmin etme, konusmalardan problemi cikarma
+
+* Learning to Execute
+  :PROPERTIES:
+  :index: 7
+  :link: http://arxiv.org/abs/1410.4615
+  :like: 1
+  :END:
+
+  + awesome!
+  + kod, input ve outputlar ile train
+
+* Generating Sequences With Recurrent Neural Networks
+  :PROPERTIES:
+  :index: 8
+  :link: http://arxiv.org/abs/1308.0850
+  :like: 2
+  :END:
+
+  + guzel gibi, ama pek bilmiyorum
+  + text ve online handwritten icin
+
+* End-To-End Memory Networks
+  :PROPERTIES:
+  :index: 9
+  :link: http://arxiv.org/abs/1503.08895
+  :like: 2
+  :END:
+
+  + ...
+
+* Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
+  :PROPERTIES:
+  :index: 10
+  :link: http://arxiv.org/abs/1503.00075
+  :like: 2
+  :END:
+
+  + ...
+
+* Recurrent Neural Network Regularization
+  :PROPERTIES:
+  :index: 11
+  :link: http://arxiv.org/abs/1409.2329
+  :like: 3
+  :END:
+
+* Deep Attention Recurrent Q-Network
+  :PROPERTIES:
+  :index: 12
+  :link: http://arxiv.org/pdf/1512.01693v1.pdf
+  :like: 1
+  :END:
+
+  + soft/hard attention
+  + atari oyunlari
+
+* Image Captioning with Semantic Attention
+  :PROPERTIES:
+  :index: 13
+  :link: http://arxiv.org/pdf/1603.03925v1.pdf
+  :like: 1
+  :END:
+
+  + CNN -> RNN
+  + resim anlandirma
+
+* Adding Gradient Noise Improves Learning for Very Deep Networks
+  :PROPERTIES:
+  :index: 14
+  :link: http://arxiv.org/abs/1511.06807
+  :like: 2
+  :END:
+
+  + avoid overfitting, lower loss
+  + question answering vs.
+
+
