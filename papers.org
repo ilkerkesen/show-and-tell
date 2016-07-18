@@ -133,7 +133,6 @@
   + bir suru modeli denemisler
 
 
-* MY BORDER
 
 * Grammar as a Foreign Language
   :PROPERTIES:
@@ -228,5 +227,83 @@
   :like:     2
   :END:
 
-
 * Sequence to Sequence Learning with Neural Networks
+
+
+* Batch Normalized Recurrent Neural Networks
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1510.01378
+  :like:     3
+  :END:
+
+* Sequence Level Training with Recurrent Neural Networks
+  :PROPERTIES:
+  :link:     http://arxiv.org/pdf/1511.06732v6.pdf
+  :like:     3
+  :END:
+
+* Character-based Neural Machine Translation
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1511.04586
+  :like:     2
+  :END:
+
+* Grid Long Short-Term Memory
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1507.01526
+  :like:     2
+  :END:
+
+* Intriguing properties of neural networks
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1312.6199
+  :like:     3
+  :END:
+
+* A Critical Review of Recurrent Neural Networks for Sequence Learning
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1506.00019
+  :like:     2
+  :END:
+
+* Multilingual Language Processing From Bytes
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1512.00103
+  :like:     3
+  :END:
+
+* Show, Attend and Tell: Neural Image Caption Generation with Visual Attention
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1502.03044
+  :like:     1
+  :END:
+
+* A Clockwork RNN
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1402.3511
+  :like:     4
+  :END:
+
+* On Multiplicative Integration with Recurrent Neural Networks
+  :PROPERTIES:
+  :link:     http://arxiv.org/pdf/1606.06630.pdf
+  :like:     4
+  :END:
+
+* Teaching Deep Convolutional Neural Networks to Play Go
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1412.3409
+  :like:     1
+  :END:
+
+* LSTM: A Search Space Odyssey
+  :PROPERTIES:
+  :link:     http://arxiv.org/abs/1503.04069
+  :like:     4
+  :END:
+
+* Mastering the game of Go with deep neural networks and tree search
+  :PROPERTIES:
+  :link:     http://www.nature.com/nature/journal/v529/n7587/full/nature16961.html
+  :like:     1
+  :END:
