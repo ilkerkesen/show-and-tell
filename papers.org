@@ -2,9 +2,8 @@
 #+AUTHOR: Ilker Kesen
 #+PROPERTY: like 1 2 3 4 5
 #+PROPERTY: link
-#+PROPERTY: index
 
-* Language Undrstanding for Text-based Games using Deep Reinforcement Learning
+* Language Understanding for Text-based Games using Deep Reinforcement Learning
   :PROPERTIES:
   :link: http://people.csail.mit.edu/regina/my_papers/TG15.pdf
   :like: 1
