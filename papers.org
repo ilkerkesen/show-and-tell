@@ -26,7 +26,7 @@
 * Improving Neural Machine Translation Models with Monolingual Data
   :PROPERTIES:
   :link: http://arxiv.org/pdf/1511.06709v4.pdf
-  :like: 4
+  :like: 5
   :END:
 
   + machine translation
@@ -34,8 +34,8 @@
 
 * Distilling the Knowledge in a Neural Network
   :PROPERTIES:
-  :link: http://arxiv.org/pdf/1503.02531v1.pdf
-  :like: 2
+  :link: http://arxiv.org/abs/1503.02531
+  :like: 3
   :END:
 
 * Pointer Networks
@@ -85,7 +85,7 @@
 * Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
   :PROPERTIES:
   :link: http://arxiv.org/abs/1503.00075
-  :like: 2
+  :like: 3
   :END:
 
   + ...
@@ -93,7 +93,7 @@
 * Recurrent Neural Network Regularization
   :PROPERTIES:
   :link: http://arxiv.org/abs/1409.2329
-  :like: 3
+  :like: 4
   :END:
 
 * Deep Attention Recurrent Q-Network
@@ -122,6 +122,7 @@
 
   + avoid overfitting, lower loss
   + question answering vs.
+
 * An Empirical Exploration of Recurrent Network Architectures
   :PROPERTIES:
   :link: http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf
