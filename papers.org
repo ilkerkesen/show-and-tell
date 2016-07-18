@@ -6,7 +6,7 @@
 * Language Understanding for Text-based Games using Deep Reinforcement Learning
   :PROPERTIES:
   :link: http://people.csail.mit.edu/regina/my_papers/TG15.pdf
-  :like: 1
+  :like:     1
   :END:
 
   + text-based
@@ -17,7 +17,7 @@
 * Language to Logical Form with Neural Attention
   :PROPERTIES:
   :link: https://arxiv.org/pdf/1601.01280v2.pdf
-  :like: 3
+  :like:     3
   :END:
 
   + machine translation
@@ -26,7 +26,7 @@
 * Improving Neural Machine Translation Models with Monolingual Data
   :PROPERTIES:
   :link: http://arxiv.org/pdf/1511.06709v4.pdf
-  :like: 5
+  :like:     5
   :END:
 
   + machine translation
@@ -35,13 +35,13 @@
 * Distilling the Knowledge in a Neural Network
   :PROPERTIES:
   :link: http://arxiv.org/abs/1503.02531
-  :like: 3
+  :like:     3
   :END:
 
 * Pointer Networks
   :PROPERTIES:
   :link: http://arxiv.org/pdf/1506.03134v1.pdf
-  :like: 1
+  :like:     1
   :END:
 
   + interesting
@@ -50,7 +50,7 @@
 * A Neural Conversational Model
   :PROPERTIES:
   :link: http://arxiv.org/abs/1506.05869
-  :like: 1
+  :like:     1
   :END:
 
   + awesome!
@@ -59,7 +59,7 @@
 * Learning to Execute
   :PROPERTIES:
   :link: http://arxiv.org/abs/1410.4615
-  :like: 1
+  :like:     1
   :END:
 
   + awesome!
@@ -68,7 +68,7 @@
 * Generating Sequences With Recurrent Neural Networks
   :PROPERTIES:
   :link: http://arxiv.org/abs/1308.0850
-  :like: 2
+  :like:     2
   :END:
 
   + guzel gibi, ama pek bilmiyorum
@@ -77,7 +77,7 @@
 * End-To-End Memory Networks
   :PROPERTIES:
   :link: http://arxiv.org/abs/1503.08895
-  :like: 2
+  :like:     2
   :END:
 
   + ...
@@ -85,7 +85,7 @@
 * Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
   :PROPERTIES:
   :link: http://arxiv.org/abs/1503.00075
-  :like: 3
+  :like:     3
   :END:
 
   + ...
@@ -99,7 +99,7 @@
 * Deep Attention Recurrent Q-Network
   :PROPERTIES:
   :link: http://arxiv.org/pdf/1512.01693v1.pdf
-  :like: 1
+  :like:     1
   :END:
 
   + soft/hard attention
@@ -108,7 +108,7 @@
 * Image Captioning with Semantic Attention
   :PROPERTIES:
   :link: http://arxiv.org/pdf/1603.03925v1.pdf
-  :like: 1
+  :like:     1
   :END:
 
   + CNN -> RNN
@@ -117,7 +117,7 @@
 * Adding Gradient Noise Improves Learning for Very Deep Networks
   :PROPERTIES:
   :link: http://arxiv.org/abs/1511.06807
-  :like: 2
+  :like:     3
   :END:
 
   + avoid overfitting, lower loss
@@ -126,7 +126,7 @@
 * An Empirical Exploration of Recurrent Network Architectures
   :PROPERTIES:
   :link: http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf
-  :like: 2
+  :like:     4
   :END:
 
   + LSTM/RNN
@@ -186,7 +186,7 @@
 * ImageNet Classification with Deep Convolutional Neural Networks
   :PROPERTIES:
   :link:     http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf
-  :like:     3
+  :like:     2
   :END:
 
   + unlu paper, CNN
