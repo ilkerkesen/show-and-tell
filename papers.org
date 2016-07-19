@@ -35,7 +35,7 @@
 * Distilling the Knowledge in a Neural Network
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1503.02531
-  :like:     3
+  :like:     4
   :END:
 
 * Pointer Networks
@@ -74,7 +74,7 @@
 * Generating Sequences With Recurrent Neural Networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1308.0850
-  :like:     2
+  :like:     3
   :END:
 
   + guzel gibi, ama pek bilmiyorum
@@ -86,12 +86,12 @@
   :like:     2
   :END:
 
-  + ...
+  + dataset?
 
 * Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1503.00075
-  :like:     3
+  :like:     4
   :END:
 
   + ...
@@ -99,7 +99,7 @@
 * Recurrent Neural Network Regularization
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1409.2329
-  :like: 4
+  :like: 5
   :END:
 
 * Deep Attention Recurrent Q-Network
@@ -110,6 +110,7 @@
 
   + soft/hard attention
   + atari oyunlari
+  + reinforcement :(
 
 * Image Captioning with Semantic Attention
   :PROPERTIES:
@@ -119,11 +120,12 @@
 
   + CNN -> RNN
   + resim anlandirma
+  + dataset var http://mscoco.org/
 
 * Adding Gradient Noise Improves Learning for Very Deep Networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1511.06807
-  :like:     3
+  :like:     2
   :END:
 
   + avoid overfitting, lower loss
@@ -132,7 +134,7 @@
 * An Empirical Exploration of Recurrent Network Architectures
   :PROPERTIES:
   :link:     http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf
-  :like:     4
+  :like:     5
   :END:
 
   + LSTM/RNN
@@ -143,7 +145,7 @@
 * Grammar as a Foreign Language
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1412.7449
-  :like:     3
+  :like:     4
   :END:
 
   + LSTM
@@ -168,31 +170,31 @@
 * Neural Programmer: Inducing Latent Programs with Gradient Descent
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1511.04834
-  :like:     1
+  :like:     2
   :END:
 
 * DRAW: A Recurrent Neural Network For Image Generation
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1502.04623
-  :like:     4
+  :like:     5
   :END:
 
 * Effective Approaches to Attention-based Neural Machine Translation
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1508.04025
-  :like:     2
+  :like:     3
   :END:
 
 * Convolutional-Recursive Deep Learning for 3D Object Classification
   :PROPERTIES:
   :link:     http://papers.nips.cc/paper/4773-convolutional-recursive-deep-learning-for-3d-object-classification.pdf
-  :like:     3
+  :like:     4
   :END:
 
 * ImageNet Classification with Deep Convolutional Neural Networks
   :PROPERTIES:
   :link:     http://papers.nips.cc/paper/4824-imagenet-classification-with-deep-convolutional-neural-networks.pdf
-  :like:     2
+  :like:     3
   :END:
 
   + unlu paper, CNN
@@ -218,13 +220,13 @@
 * Connectionist Temporal Classification: Labelling Unsegmented Sequence Data with Recurrent Neural Networks
   :PROPERTIES:
   :link:     http://www.cs.toronto.edu/~graves/icml_2006.pdf
-  :like:     4
+  :like:     5
   :END:
 
 * Unitary Evolution Recurrent Neural Networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1511.06464
-  :like:     4
+  :like:     5
   :END:
 
 * Learning Simple Algorithms from Examples
@@ -243,7 +245,7 @@
 * Batch Normalized Recurrent Neural Networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1510.01378
-  :like:     3
+  :like:     4
   :END:
 
 * Sequence Level Training with Recurrent Neural Networks
@@ -261,25 +263,25 @@
 * Grid Long Short-Term Memory
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1507.01526
-  :like:     2
+  :like:     3
   :END:
 
 * Intriguing properties of neural networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1312.6199
-  :like:     3
+  :like:     4
   :END:
 
 * A Critical Review of Recurrent Neural Networks for Sequence Learning
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1506.00019
-  :like:     2
+  :like:     3
   :END:
 
 * Multilingual Language Processing From Bytes
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1512.00103
-  :like:     3
+  :like:     4
   :END:
 
 * Show, Attend and Tell: Neural Image Caption Generation with Visual Attention
@@ -291,7 +293,7 @@
 * A Clockwork RNN
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1402.3511
-  :like:     4
+  :like:     5
   :END:
 
 * On Multiplicative Integration with Recurrent Neural Networks
@@ -309,7 +311,7 @@
 * LSTM: A Search Space Odyssey
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1503.04069
-  :like:     4
+  :like:     5
   :END:
 
 * Mastering the game of Go with deep neural networks and tree search
