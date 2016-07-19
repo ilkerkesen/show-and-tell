@@ -5,7 +5,7 @@
 
 * Language Understanding for Text-based Games using Deep Reinforcement Learning
   :PROPERTIES:
-  :link: http://people.csail.mit.edu/regina/my_papers/TG15.pdf
+  :link:     http://people.csail.mit.edu/regina/my_papers/TG15.pdf
   :like:     1
   :END:
 
@@ -16,7 +16,7 @@
 
 * Language to Logical Form with Neural Attention
   :PROPERTIES:
-  :link: https://arxiv.org/pdf/1601.01280v2.pdf
+  :link:     https://arxiv.org/pdf/1601.01280v2.pdf
   :like:     3
   :END:
 
@@ -25,7 +25,7 @@
 
 * Improving Neural Machine Translation Models with Monolingual Data
   :PROPERTIES:
-  :link: http://arxiv.org/pdf/1511.06709v4.pdf
+  :link:     http://arxiv.org/pdf/1511.06709v4.pdf
   :like:     5
   :END:
 
@@ -34,40 +34,46 @@
 
 * Distilling the Knowledge in a Neural Network
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1503.02531
+  :link:     http://arxiv.org/abs/1503.02531
   :like:     3
   :END:
 
 * Pointer Networks
   :PROPERTIES:
-  :link: http://arxiv.org/pdf/1506.03134v1.pdf
+  :link:     http://arxiv.org/pdf/1506.03134v1.pdf
   :like:     1
   :END:
 
   + interesting
   + convex hull, TSP vs.
+  + adam kendi datasini generate etmis nasil yaptigini da aciklamis
 
 * A Neural Conversational Model
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1506.05869
+  :link:     http://arxiv.org/abs/1506.05869
   :like:     1
   :END:
 
   + awesome!
   + konusmalari tahmin etme, konusmalardan problemi cikarma
+  + dataset: http://opus.lingfil.uu.se/OpenSubtitles.php
+  + soyle bir depo var: https://github.com/macournoyer/neuralconvo
+  + onun dataseti: http://www.mpi-sws.org/~cristian/Cornell_Movie-Dialogs_Corpus.html
+  + IT desk dataseti yok, kapali cunku
 
 * Learning to Execute
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1410.4615
-  :like:     1
+  :link:     http://arxiv.org/abs/1410.4615
+  :like:     3
   :END:
 
   + awesome!
   + kod, input ve outputlar ile train
+  + basit, pek bir sey yokmus, like'i 3'e cektim
 
 * Generating Sequences With Recurrent Neural Networks
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1308.0850
+  :link:     http://arxiv.org/abs/1308.0850
   :like:     2
   :END:
 
@@ -76,7 +82,7 @@
 
 * End-To-End Memory Networks
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1503.08895
+  :link:     http://arxiv.org/abs/1503.08895
   :like:     2
   :END:
 
@@ -84,7 +90,7 @@
 
 * Improved Semantic Representations From Tree-Structured Long Short-Term Memory Networks
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1503.00075
+  :link:     http://arxiv.org/abs/1503.00075
   :like:     3
   :END:
 
@@ -92,13 +98,13 @@
 
 * Recurrent Neural Network Regularization
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1409.2329
+  :link:     http://arxiv.org/abs/1409.2329
   :like: 4
   :END:
 
 * Deep Attention Recurrent Q-Network
   :PROPERTIES:
-  :link: http://arxiv.org/pdf/1512.01693v1.pdf
+  :link:     http://arxiv.org/pdf/1512.01693v1.pdf
   :like:     1
   :END:
 
@@ -107,7 +113,7 @@
 
 * Image Captioning with Semantic Attention
   :PROPERTIES:
-  :link: http://arxiv.org/pdf/1603.03925v1.pdf
+  :link:     http://arxiv.org/pdf/1603.03925v1.pdf
   :like:     1
   :END:
 
@@ -116,7 +122,7 @@
 
 * Adding Gradient Noise Improves Learning for Very Deep Networks
   :PROPERTIES:
-  :link: http://arxiv.org/abs/1511.06807
+  :link:     http://arxiv.org/abs/1511.06807
   :like:     3
   :END:
 
@@ -125,7 +131,7 @@
 
 * An Empirical Exploration of Recurrent Network Architectures
   :PROPERTIES:
-  :link: http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf
+  :link:     http://jmlr.org/proceedings/papers/v37/jozefowicz15.pdf
   :like:     4
   :END:
 
@@ -153,7 +159,7 @@
 * Move Evaluation in Go Using Deep Convolutional Neural Networks
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1412.6564
-  :like:     1
+  :like:     2
   :END:
 
   + CNN, GO
@@ -194,7 +200,7 @@
 * Framewise Phoneme Classification with Bidirectional LSTM and Other Neural Network Architectures
   :PROPERTIES:
   :link:     http://www.cs.toronto.edu/~graves/nn_2005.pdf
-  :like:     4
+  :like:     5
   :END:
 
 * Training Very Deep Networks
@@ -228,6 +234,10 @@
   :END:
 
 * Sequence to Sequence Learning with Neural Networks
+  :PROPERTIES:
+  :link:     https://arxiv.org/abs/1409.3215
+  :like:     2
+  :END:
 
 
 * Batch Normalized Recurrent Neural Networks
@@ -293,7 +303,7 @@
 * Teaching Deep Convolutional Neural Networks to Play Go
   :PROPERTIES:
   :link:     http://arxiv.org/abs/1412.3409
-  :like:     1
+  :like:     2
   :END:
 
 * LSTM: A Search Space Odyssey
@@ -305,5 +315,5 @@
 * Mastering the game of Go with deep neural networks and tree search
   :PROPERTIES:
   :link:     http://www.nature.com/nature/journal/v529/n7587/full/nature16961.html
-  :like:     1
+  :like:     2
   :END:
