@@ -47,4 +47,15 @@ This paper :cite:`karpathy2015deep` presents a novel framework which consists of
 
    Model Overview (Only generation, without alignment)
 
+Learning a recurrent visual representation for image caption generation
+-------------------------------------------------------------------------
+This paper :cite:`chen2014learning` introduces a novel model which aims not only generating captions from images but also building visual features from previous words at the same time. Actually, the proposed model is more complicated than the papers which I've summarized above (and I haven't understand it completely). They used a pretrained CNN for obtaining visual features same as the papers above. Words are represented as *one hot vectors* whose size is equal to the size of vocabulary. It has been implied in the paper, caption generation results were state-of-art by then.
+
+.. figure:: static/minds-eye.png
+   :align: center
+   :scale: 100%
+   :alt: Model Overview
+
+In the figure, :math:`w_t`, :math:`s_t`, :math:`u_t` are word, hidden state and latent variable at time :math:`t` respectively.
+
 .. bibliography:: survey.bib
