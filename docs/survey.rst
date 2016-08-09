@@ -3,7 +3,7 @@ Literature Survey
 
 Show and Tell: A Neural Image Caption Generator 
 --------------------------------------------------
-It is a simple end-to-end model :cite:`vinyals2015show` which is built on top of a Convolutional Neural Network (CNN) and a special type of Recurrent Neural Network called as Long Short Term Memory Network (LSTM) . At initial time step visual are used in LSTMs as input. After first time step, vector representations of sentence words becomes input parameters of recurrent network. Word embeddings are also learned during training. Sampling and BeamSearch methods are used for inference. The proposed framework is tested on five different public datasets and it was the state-of-art by then. Generation and ranking results are reported using several evaluation metrics. There's also an `TensorFlow implementation <https://github.com/jazzsaxmafia/show_attend_and_tell.tensorflow>`_
+It is a simple end-to-end model :cite:`vinyals2015show` which is built on top of a Convolutional Neural Network (CNN) and a special type of Recurrent Neural Network called as Long Short Term Memory Network (LSTM) . At initial time step visual are used in LSTMs as input. After first time step, vector representations of sentence words becomes input parameters of recurrent network. Word embeddings are also learned during training. Sampling and BeamSearch methods are used for inference. The proposed framework is tested on five different public datasets and it was the state-of-art by then. Generation and ranking results are reported using several evaluation metrics. There's also `TensorFlow implementation <https://github.com/jazzsaxmafia/show_attend_and_tell.tensorflow>`_.
 
 .. figure:: static/show-and-tell.png
    :align: center
@@ -57,5 +57,9 @@ This paper :cite:`chen2014learning` introduces a novel model which aims not only
    :alt: Model Overview
 
 In the figure, :math:`w_t`, :math:`s_t`, :math:`u_t` are word, hidden state and latent variable at time :math:`t` respectively.
+
+From captions to visual concepts and back
+-------------------------------------------
+The actual paper I've selected as my project :cite:`you2016image` mentions this paper :cite:`fang2015captions` and implies that it follows a different approach (*bottom-up*) unlike the others I've read until now. As reported in `COCO Leaderboard <http://mscoco.org/dataset/#captions-leaderboard>`_, it showed state-of-art results according to some evaluation metrics which humans involve. First, the model tries to find word correspondences for image regions by extracting features with a CNN and then combining those features with multiple instance learning. Later then, a statistical language model (maximum entropy) generates candidate sentences with usage of beam search. After generation, the sentences are re-ranked using minimum error rate training. Re-ranking is done by a deep multimodal similarity model which extends deep structured semantic model.
 
 .. bibliography:: survey.bib
