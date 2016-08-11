@@ -77,4 +77,20 @@ This :cite:`you2016image` is my actual project paper. Its model also consists of
    :scale: 100%
 
 
+What value high level concepts in vision to language problems?
+----------------------------------------------------------------
+This one :cite:`wu2015value` seeks a common solution for both image captioning and visual question answering task. They claimed that the proposed model surpassed previous state-of-art methods (including my actual paper) for both tasks (also better than human evaluation according to some metrics). In the beginning, they build an attribute vocabulary which contains image-word probabilities (part of speech merged). The language model is built on top of LSTM network which uses attributes vector and CNN features as initial inputs and sentence words as sequential inputs. Note that, this paper's first version was published in 2015, and then they've updated it 5 times. I have just read its first version quickly and their model was similar but they couldn't outperform the state-of-art by then.
+
+.. figure:: static/attr1.png
+   :align: center
+   :scale: 100%
+
+   Framework Overview
+
+.. figure:: static/attr2.png
+   :align: center
+   :scale: 100%
+
+   Language Model
+
 .. bibliography:: survey.bib
