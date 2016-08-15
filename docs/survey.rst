@@ -3,7 +3,7 @@ Literature Survey
 
 Show and Tell: A Neural Image Caption Generator 
 --------------------------------------------------
-It is a simple end-to-end model :cite:`vinyals2015show` which is built on top of a Convolutional Neural Network (CNN) and a special type of Recurrent Neural Network called as Long Short Term Memory Network (LSTM) . At initial time step visual are used in LSTMs as input. After first time step, vector representations of sentence words becomes input parameters of recurrent network. Word embeddings are also learned during training. Sampling and BeamSearch methods are used for inference. The proposed framework is tested on five different public datasets and it was the state-of-art by then. Generation and ranking results are reported using several evaluation metrics. There's also `TensorFlow implementation <https://github.com/jazzsaxmafia/show_attend_and_tell.tensorflow>`_.
+It is a simple end-to-end model :cite:`vinyals2015show` which is built on top of a Convolutional Neural Network (CNN) and a special type of Recurrent Neural Network called as Long Short Term Memory Network (LSTM) . At initial time step visual are used in LSTMs as input. After first time step, vector representations of sentence words becomes input parameters of recurrent network. Word embeddings are also learned during training. Sampling and BeamSearch methods are used for inference. The proposed framework is tested on five different public datasets and it was the state-of-art by then. Generation and ranking results are reported using several evaluation metrics. There's also `TensorFlow implementation <https://github.com/jazzsaxmafia/show_and_tell.tensorflow>`_.
 
 .. figure:: static/show-and-tell.png
    :align: center
