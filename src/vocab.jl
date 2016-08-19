@@ -11,7 +11,7 @@ type Vocabulary
     sorted # sorted word counts tuple, for stats
     w2i # word to index dict
     i2w # index to word array
-    size
+    size # vocabulary size, total different words count
 
     function Vocabulary(words::Array{Any,1}, MIN_OCCUR=5)
         # get word counts
@@ -40,7 +40,7 @@ type Vocabulary
         w2i[UNK] = i+2
 
         # let's build index2word array
-        i2w = zeros(i+2)
+        i2w = map(j -> "", zeros(i+2))
         for (k,v) in w2i
             i2w[v] = k
         end
@@ -49,7 +49,8 @@ type Vocabulary
     end
 end
 
-word2index(voc::Vocabulary, w) = haskey(voc.w2i, w) ? voc.w2i[w] : voc.w2i["#UNK#"]
+word2index(voc::Vocabulary, w) = haskey(voc.w2i, w) ? voc.w2i[w] : voc.w2i[UNK]
 index2word(voc::Vocabulary, i) = voc.i2w[i]
 most_occurs(voc::Vocabulary, N) = map(x -> (x.first, y.first), voc.sorted[1:N])
-word2onehot(voc::Vocabulary, w) = (v = zeros(voc.size); v[word2index(voc, w)] = 1; v)
+word2onehot(voc::Vocabulary, w) = (v = zeros(voc.size,1); v[word2index(voc, w)] = 1; v)
+sen2mat(voc::Vocabulary, s) = mapreduce(w -> word2index(voc, w), vcat, s)
