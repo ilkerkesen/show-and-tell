@@ -1,3 +1,5 @@
+using MAT, JSON
+
 # for karpathy data
 function build_data(vgg_filename, json_filename)
     vgg_fs = matread(vgg_filename)["feats"]
@@ -19,7 +21,8 @@ function build_data(vgg_filename, json_filename)
     # build vocabulary
     voc = Vocabulary(words)
 
-    helper(a) = mapreduce(e -> map(s -> (e[2]["filename"], e[1], sen2mat(voc, s["tokens"])), e[2]["sentences"]), vcat, a)
+    # build sentences
+    helper(a) = mapreduce(e -> map(s -> (e[2]["filename"], e[1], sen2vec(voc, s["tokens"])), e[2]["sentences"]), vcat, a)
     trn, val, tst = map(i -> helper(data[i]), ["train", "val", "test"])
 
     return (data, voc, trn, val, tst)
