@@ -9,10 +9,10 @@ using Knet
 #
 # for encoding x is visual features extracted from CNN
 # for decoding x is one hot word fectors, later converted to embeedings
-@knet function show_and_tell(x; fbias=0, vocab=0, decoding=true, o...)
+@knet function show_and_tell(x; embed=0, vocabsize=0, fbias=0, decoding=true, o...)
     if !decoding
         # visual embeddings (v <- x)
-        v = wbf(x, out=d)
+        v = wdot(x, out=embed)
 
         # LSTM, visual embeddings as input
         i = wbf2(v,m; o..., f=:sigm)
@@ -21,7 +21,7 @@ using Knet
         n = wbf2(v,m; o..., f=:tanh)
     else
         # word embeddings (w <- x)
-        w = wbf(x, out=d)
+        w = wdot(x, out=embed)
 
         # LSTM, word embeddings as input
         i = wbf2(w,m; o..., f=:sigm)
@@ -35,6 +35,6 @@ using Knet
     m  = c .* o
 
     if decoding
-        return soft(m)
+        return soft(m, out=vocabsize)
     end
 end
