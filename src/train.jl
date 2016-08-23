@@ -1,7 +1,7 @@
 using Knet
 
 # iteration for one sample forw/back
-function iter!(f, sample; loss=softloss, gclip=0.0, test=false)
+function iter(f, sample; loss=softloss, gclip=0.0, test=false)
     reset!(f)
     ystack = Any[nothing]
     sumloss = 0.0
@@ -34,7 +34,7 @@ function iter!(f, sample; loss=softloss, gclip=0.0, test=false)
 end
 
 # one epoch training
-train!(f, data, voc) = map!(s -> iter!(f, s), data)
+train(f, data, voc) = map!(s -> iter(f, s), data)
 
 # mean loss
-test!(f, data, voc) = mean(map!(s -> iter!(f, s; test=true), data))
+test(f, data, voc) = mean(map!(s -> iter(f, s; test=true), data))

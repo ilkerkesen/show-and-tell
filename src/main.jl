@@ -38,7 +38,7 @@ function main(args=ARGS)
     end
 
     for epoch = 1:o[:epochs]
-        train!(net, trn, voc)
+        train(net, trn, voc)
         @printf("epoch:%d softloss:%g/%g\n", epoch,
                 test(net, trn, voc),
                 test(net, tst, voc))
