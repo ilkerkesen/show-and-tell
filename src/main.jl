@@ -43,6 +43,7 @@ function main(args=ARGS)
                 test(net, trn, voc),
                 test(net, tst, voc))
     end
+    o[:savefile]!=nothing && save(o[:savefile], "net", clean(net))
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)
