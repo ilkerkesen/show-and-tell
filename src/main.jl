@@ -4,24 +4,25 @@ using MAT, JSON
 include("vocab.jl");
 include("data.jl");
 include("train.jl");
+include("model.jl")
 
-function main(args=ARGS)
+function main(args)
     s = ArgParseSettings()
     s.description = "Show and Tell: A Neural Image Caption Generator implementation by Ilker Kesen, 2016. Karpathy's data used."
 
     @add_arg_table s begin
-        ("--vggfile", help="MAT file contains VGG features")
-        ("--jsonfile", help="JSON file contains text data")
-        ("--loadfile", default=nothing, help="pretrained model file if any")
-        ("--savefile", default=nothing, help="model save file after train")
-        ("--hidden", arg_type=Int, default=256)
-        ("--embedding", arg_type=Int, default=256)
-        ("--epochs", arg_type=Int, default=10)
-        ("--batchsize", arg_type=Int, default=128)
-        ("--seqlength", arg_type=Int, default=100)
-        ("--decay", arg_type=Float64, default=0.9)
-        ("--lr", arg_type=Float64, default=0.2)
-        ("--gclip", arg_type=Float64, default=5.0)
+        ("--vggfile"; help="MAT file contains VGG features")
+        ("--jsonfile"; help="JSON file contains text data")
+        ("--loadfile"; default=nothing; help="pretrained model file if any")
+        ("--savefile"; default=nothing; help="model save file after train")
+        ("--hidden"; arg_type=Int; default=256)
+        ("--embed"; arg_type=Int; default=256)
+        ("--epochs"; arg_type=Int; default=10)
+        ("--batchsize"; arg_type=Int; default=128)
+        ("--seqlength"; arg_type=Int; default=100)
+        ("--decay"; arg_type=Float64; default=0.9)
+        ("--lr"; arg_type=Float64; default=0.2)
+        ("--gclip"; arg_type=Float64; default=5.0)
     end
 
     # parse args
@@ -41,7 +42,7 @@ function main(args=ARGS)
         train(net, trn, voc)
         @printf("epoch:%d softloss:%g/%g\n", epoch,
                 test(net, trn, voc),
-                test(net, tst, voc))
+                test(net, val, voc))
     end
     o[:savefile]!=nothing && save(o[:savefile], "net", clean(net))
 end

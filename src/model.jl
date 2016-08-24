@@ -10,30 +10,25 @@ using Knet
 # for encoding x is visual features extracted from CNN
 # for decoding x is one hot word fectors, later converted to embeedings
 @knet function show_and_tell(x; embed=0, vocabsize=0, fbias=0, decoding=true, o...)
-    if !decoding
-        # visual embeddings (v <- x)
-        v = wdot(x, out=embed)
-
-        # LSTM, visual embeddings as input
-        i = wbf2(v,m; o..., f=:sigm)
-        f = wbf2(v,m; o..., f=:sigm, binit=Constant(fbias))
-        o = wbf2(v,m; o..., f=:sigm)
-        n = wbf2(v,m; o..., f=:tanh)
+    # decoding -> word emb
+    # encoding -> visual emb
+    if decoding
+        e = wdot(x, out=embed)
     else
-        # word embeddings (w <- x)
-        w = wdot(x, out=embed)
-
-        # LSTM, word embeddings as input
-        i = wbf2(w,m; o..., f=:sigm)
-        f = wbf2(w,m; o..., f=:sigm, binit=Constant(fbias))
-        o = wbf2(w,m; o..., f=:sigm)
-        n = wbf2(w,m; o..., f=:tanh)
+        e = wdot(x, out=embed)
     end
+
+    # LSTM, embeddings as input
+    i = wbf2(e,m; o..., f=:sigm)
+    f = wbf2(e,m; o..., f=:sigm, binit=Constant(fbias))
+    o = wbf2(e,m; o..., f=:sigm)
+    n = wbf2(e,m; o..., f=:tanh)
 
     # note that, tanh operation performed above
     c = c .* f + i .* n
     m  = c .* o
 
+    # word prediction
     if decoding
         return soft(m, out=vocabsize)
     end

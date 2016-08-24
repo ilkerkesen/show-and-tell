@@ -19,22 +19,41 @@ function iter(f, sample; loss=softloss, gclip=0.0, test=false)
         test && push!(ystack, sp[:,j+1])
     end
 
-    test && return sumloss/N
-
     # backprop
-    while !isempty(ystack)
-        ygold = pop!(ystack)
-        sback(f, ygold, loss)
-    end
+    if !test
+        while !isempty(ystack)
+            ygold = pop!(ystack)
+            sback(f, ygold, loss)
+        end
 
-    update!(f; gclip=gclip)
-    reset!(f; keepstate=true)
+        update!(f; gclip=gclip)
+        reset!(f; keepstate=true)
+    end
 
     return sumloss/N
 end
 
 # one epoch training
-train(f, data, voc) = map!(s -> iter(f, s), data)
+function train(f, data, voc)
+    sumloss, numloss = 0.0, 0
+    for s in data
+        sumloss += iter(f,s)
+        numloss += 1
+        if numloss % 1000 == 0
+            println(numloss)
+        end
+    end
+end
 
 # mean loss
-test(f, data, voc) = mean(map!(s -> iter(f, s; test=true), data))
+function test(f, data, voc)
+    sumloss, numloss = 0.0, 0
+    for s in data
+        sumloss += iter(f,s;test=true)
+        numloss += 1
+        if numloss % 1000 == 0
+            println(numloss)
+        end
+    end
+    return sumloss/numloss
+end
