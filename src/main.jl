@@ -46,7 +46,7 @@ function main(args)
     # training process
     println("Training has been started...")
     for epoch = 1:o[:epochs]
-        train(f, trn, voc, gclip=o[:gclip])
+        train(f, trn, voc; gclip=o[:gclip])
         @printf("epoch:%d softloss:%g/%g\n", epoch,
                 test(f, trn, voc),
                 test(f, val, voc))
