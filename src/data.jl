@@ -22,7 +22,7 @@ function build_data(vgg_filename, json_filename)
     voc = Vocabulary(words)
 
     # build sentences
-    helper(a) = mapreduce(e -> map(s -> (e[2]["filename"], e[1], sen2vec(voc, s["tokens"])), e[2]["sentences"]), vcat, a)
+    helper(a) = mapreduce(e -> map(s -> (e[2]["filename"], e[1], sen2smat(voc, s["tokens"])), e[2]["sentences"]), vcat, a)
     trn, val, tst = map(i -> helper(data[i]), ["train", "val", "test"])
 
     return (data, voc, trn, val, tst)

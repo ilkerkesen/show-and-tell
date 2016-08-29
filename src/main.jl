@@ -31,19 +31,28 @@ function main(args)
 
     # build vocabulary and split data
     data, voc, trn, val, tst = build_data(o[:vggfile], o[:jsonfile])
+    println("Data loaded...")
 
+    # compile knet model
     if o[:loadfile] == nothing
-        net = compile(:show_and_tell, embed=o[:embed], out=o[:hidden], vocabsize=voc.size)
+        f = compile(:show_and_tell; out=o[:hidden], vocabsize=voc.size,embed=o[:embed])
     else
-        net = load(o[:loadfile])
+        f = load(o[:loadfile])
     end
 
+    # set learning rate
+    setp(f; lr=o[:lr])
+
+    # training process
+    println("Training has been started...")
     for epoch = 1:o[:epochs]
-        train(net, trn, voc)
+        train(f, trn, voc, gclip=o[:gclip])
         @printf("epoch:%d softloss:%g/%g\n", epoch,
-                test(net, trn, voc),
-                test(net, val, voc))
+                test(f, trn, voc),
+                test(f, val, voc))
     end
+
+    # save trained model
     o[:savefile]!=nothing && save(o[:savefile], "net", clean(net))
 end
 

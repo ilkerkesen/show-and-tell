@@ -54,5 +54,5 @@ index2word(voc::Vocabulary, i) = voc.i2w[i]
 most_occurs(voc::Vocabulary, N) = map(x -> (x.first, y.first), voc.sorted[1:N])
 word2onehot(voc::Vocabulary, w) = (v = zeros(voc.size,1); v[word2index(voc, w)] = 1; v)
 sen2vec(voc::Vocabulary, s) = mapreduce(w -> word2index(voc, w), vcat, s)
-word2svec(voc::Vocabulary, w) = (v = spzeros(voc.size,1); v[word2index(voc, w)] = 1; v)
+word2svec(voc::Vocabulary, w) = (v = map(Float32,spzeros(voc.size,1)); v[word2index(voc, w)] = 1; v)
 sen2smat(voc::Vocabulary, s) = mapreduce(w -> word2svec(voc, w), hcat, [SOS;s;EOS])

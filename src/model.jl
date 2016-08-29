@@ -5,17 +5,15 @@ using Knet
 #
 # using same notation in the paper
 # i: input, f: forget, o: output, n: new memory
-# m: memory, c: cell, w: word embeddings
+# m: memory, c: cell, e: embeddings
+# v: visual input, s: sentence input
 #
-# for encoding x is visual features extracted from CNN
-# for decoding x is one hot word fectors, later converted to embeedings
-@knet function show_and_tell(x; embed=0, vocabsize=0, fbias=0, decoding=true, o...)
-    # decoding -> word emb
-    # encoding -> visual emb
+# FIXME: why do i have to send both input while just one of them is being used?
+@knet function show_and_tell(v, s; embed=0, vocabsize=0, decoding=true, fbias=0, o...)
     if decoding
-        e = wdot(x, out=embed)
+        e = wdot(s; out=embed)
     else
-        e = wdot(x, out=embed)
+        e = wdot(v; out=embed)
     end
 
     # LSTM, embeddings as input
@@ -30,6 +28,6 @@ using Knet
 
     # word prediction
     if decoding
-        return soft(m, out=vocabsize)
+        return wbf(m; out=vocabsize, f=:soft)
     end
 end
