@@ -27,11 +27,12 @@ function main(args)
 
     # parse args
     isa(args, AbstractString) && (args=split(args))
-    o = parse_args(args, s; as_symbols=true); println(o)
+    o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
     # build vocabulary and split data
     data, voc, trn, val, tst = build_data(o[:vggfile], o[:jsonfile])
     println("Data loaded...")
+    flush(STDOUT)
 
     # compile knet model
     if o[:loadfile] == nothing
@@ -44,12 +45,13 @@ function main(args)
     setp(f; lr=o[:lr])
 
     # training process
-    println("Training has been started...")
+    @println("Training has been started..."); flush(STDOUT)
     for epoch = 1:o[:epochs]
         train(f, trn, voc; gclip=o[:gclip])
         @printf("epoch:%d softloss:%g/%g\n", epoch,
                 test(f, trn, voc),
                 test(f, val, voc))
+        flush(STDOUT)
     end
 
     # save trained model
