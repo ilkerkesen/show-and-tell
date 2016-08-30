@@ -45,7 +45,7 @@ function main(args)
     setp(f; lr=o[:lr])
 
     # training process
-    @println("Training has been started..."); flush(STDOUT)
+    @printf("Training has been started...\n"); flush(STDOUT)
     for epoch = 1:o[:epochs]
         train(f, trn, voc; gclip=o[:gclip])
         @printf("epoch:%d softloss:%g/%g\n", epoch,
