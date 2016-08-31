@@ -1,5 +1,5 @@
 using Knet, ArgParse
-using MAT, JSON
+using MAT, JSON, JLD
 
 include("vocab.jl");
 include("data.jl");
@@ -36,26 +36,28 @@ function main(args)
 
     # compile knet model
     if o[:loadfile] == nothing
-        f = compile(:show_and_tell; out=o[:hidden], vocabsize=voc.size,embed=o[:embed])
+        net = compile(:show_and_tell; out=o[:hidden], vocabsize=voc.size, embed=o[:embed])
     else
-        f = load(o[:loadfile])
+        net = load(o[:loadfile])
     end
 
     # set learning rate
-    setp(f; lr=o[:lr])
+    setp(net; lr=o[:lr])
 
     # training process
     @printf("Training has been started...\n"); flush(STDOUT)
     for epoch = 1:o[:epochs]
-        train(f, trn, voc; gclip=o[:gclip])
+        train(net, trn, voc; gclip=o[:gclip])
         @printf("epoch:%d softloss:%g/%g\n", epoch,
-                test(f, trn, voc),
-                test(f, val, voc))
+                test(net, trn, voc),
+                test(net, val, voc))
         flush(STDOUT)
     end
 
     # save trained model
-    o[:savefile]!=nothing && save(o[:savefile], "net", clean(net))
+    if o[:savefile] != nothing
+        save(o[:savefile], "net", clean(net))
+    end
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)
