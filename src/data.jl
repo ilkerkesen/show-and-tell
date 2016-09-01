@@ -1,4 +1,32 @@
-using MAT, JSON
+using MAT, JSON, ArgParse, JLD
+include("vocab.jl")
+
+
+function main(args)
+    s = ArgParseSettings()
+    s.description = "Data preprocessing for Karpathy data."
+
+    @add_arg_table s begin
+        ("--vggfile"; help="MAT file contains VGG features")
+        ("--jsonfile"; help="JSON file contains text data")
+        ("--savefile"; help="data save file")
+    end
+
+    # parse args
+    isa(args, AbstractString) && (args=split(args))
+    o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+
+    # build vocabulary and split data
+    voc, trn, val, tst = build_data(o[:vggfile], o[:jsonfile])
+    println("Data processing completed.")
+    flush(STDOUT)
+
+    # save data
+    save(o[:savefile], "voc", voc, "trn", trn, "val", val, "tst", tst)
+    println("Processed data saved to ", o[:savefile])
+    flush(STDOUT)
+end
+
 
 # for karpathy data
 function build_data(vgg_filename, json_filename)
@@ -22,8 +50,10 @@ function build_data(vgg_filename, json_filename)
     voc = Vocabulary(words)
 
     # build sentences
-    helper(a) = mapreduce(e -> map(s -> (e[2]["filename"], e[1], sen2smat(voc, s["tokens"])), e[2]["sentences"]), vcat, a)
+    helper(a) = mapreduce(e -> map(s -> (e[2]["filename"], e[1], sen2vec(voc, s["tokens"])), e[2]["sentences"]), vcat, a)
     trn, val, tst = map(i -> helper(data[i]), ["train", "val", "test"])
 
-    return (data, voc, trn, val, tst)
+    return (voc, trn, val, tst)
 end
+
+!isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

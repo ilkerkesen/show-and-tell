@@ -1,10 +1,10 @@
 using MAT
 using JSON
 
-SOS = "#SOS#"
-EOS = "#EOS#"
-PAD = "#PAD#"
-UNK = "#UNK#"
+SOS = "#SOS#" # start of sentence token
+EOS = "#EOS#" # end of sentence token 
+PAD = "#PAD#" # padding token
+UNK = "#UNK#" # token for unknown words
 
 type Vocabulary
     counts # word counts dict
@@ -56,3 +56,5 @@ word2onehot(voc::Vocabulary, w) = (v = zeros(voc.size,1); v[word2index(voc, w)] 
 sen2vec(voc::Vocabulary, s) = mapreduce(w -> word2index(voc, w), vcat, s)
 word2svec(voc::Vocabulary, w) = (v = map(Float32,spzeros(voc.size,1)); v[word2index(voc, w)] = 1; v)
 sen2smat(voc::Vocabulary, s) = mapreduce(w -> word2svec(voc, w), hcat, [SOS;s;EOS])
+pad2index(voc::Vocabulary) = word2index(voc, PAD)
+pad2oneheot(voc::Vocabulary) = word2onehot(voc, PAD) 
