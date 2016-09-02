@@ -39,7 +39,7 @@ function main(args)
         net = compile(:imgcap;
                       out=o[:hidden],
                       vocabsize=voc.size,
-                      embed=o[:embed]
+                      embed=o[:embed],
                       pdrop=o[:dropout])
     else
         net = load(o[:loadfile])
@@ -68,7 +68,7 @@ end
 # one epoch training
 function train(f, data, voc; o...)
     for batch in data
-        iter(f, s; o...)
+        iter(f, batch; o...)
     end
 end
 
@@ -102,7 +102,7 @@ function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...
         ygold, cw = txt[:,:,j+1], txt[:,:,j]
         ypred = (tst?forw:sforw)(f, cw; decoding=true, dropout=dropout)
         sumloss += loss(ypred, ygold; mask=msk[:,j])
-        push!(ystack, (ygold, msk))
+        push!(ystack, (ygold, msk[:,j]))
     end
 
     if tst
@@ -140,20 +140,18 @@ function make_batches(data, voc, batchsize)
         visual = mapreduce(s -> s[2], hcat, samples)
 
         # build sentences & masks tensors
-        sentences = zeros(Cuchar, voc.size, upper-lower+1, longest)
-        masks = zeros(Cuchar, upper-lower, longest)
+        sentences = zeros(Float32, voc.size, upper-lower+1, longest)
+        masks = zeros(Cuchar, upper-lower+1, longest)
         for i = 1:upper-lower+1 # slice
             sen = samples[i][3]
             len = length(sen)
             for j = 1:longest # sentence
                 if j <= len
                     wi = word2index(voc, sen[j])
-                    # println(wi, " ", i, " ", j, " ", n)
                     sentences[wi, i, j] = 0x01
                     masks[i, j] = 0x01
                 else
                     wi = pad2index(voc)
-                    # println(wi, " ", i, " ", j, " ", n)
                     sentences[pad2index(voc), i, j] = 0x01
                 end
             end
