@@ -13,11 +13,12 @@ function main(args)
         ("--datafile"; help="data file contains dataset splits and vocabulary")
         ("--loadfile"; default=nothing; help="pretrained model file if any")
         ("--savefile"; default=nothing; help="model save file after train")
-        ("--hidden"; arg_type=Int; default=256)
-        ("--embed"; arg_type=Int; default=256)
+        ("--hidden"; arg_type=Int; default=512)
+        ("--embed"; arg_type=Int; default=512)
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=128)
         ("--lr"; arg_type=Float64; default=0.2)
+        ("--dropout"; arg_type=Float64; default=0.5)
         ("--gclip"; arg_type=Float64; default=5.0)
     end
 
@@ -35,7 +36,11 @@ function main(args)
 
     # compile knet model
     if o[:loadfile] == nothing
-        net = compile(:show_and_tell; out=o[:hidden], vocabsize=voc.size, embed=o[:embed])
+        net = compile(:imgcap;
+                      out=o[:hidden],
+                      vocabsize=voc.size,
+                      embed=o[:embed]
+                      pdrop=o[:dropout])
     else
         net = load(o[:loadfile])
     end
@@ -46,7 +51,7 @@ function main(args)
     # training loop
     @printf("Training has been started...\n"); flush(STDOUT)
     for epoch = 1:o[:epochs]
-        train(net, trn, voc; gclip=o[:gclip])
+        train(net, trn, voc; gclip=o[:gclip], dropout=(o[:dropout]>0.0))
         @printf("epoch:%d softloss:%g/%g\n", epoch,
                 test(net, trn, voc),
                 test(net, val, voc))
@@ -81,7 +86,7 @@ end
 
 
 # iteration for one batch forw/back
-function iter(f, batch; loss=softloss, gclip=0.0, tst=false, o...)
+function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...)
     reset!(f)
     ystack = Any[]
     sumloss = 0.0
@@ -95,7 +100,7 @@ function iter(f, batch; loss=softloss, gclip=0.0, tst=false, o...)
 
     for j=1:N
         ygold, cw = txt[:,:,j+1], txt[:,:,j]
-        ypred = (tst?forw:sforw)(f, cw; decoding=true)
+        ypred = (tst?forw:sforw)(f, cw; decoding=true, dropout=dropout)
         sumloss += loss(ypred, ygold; mask=msk[:,j])
         push!(ystack, (ygold, msk))
     end

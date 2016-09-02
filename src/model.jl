@@ -7,7 +7,8 @@ using Knet
 # i: input, f: forget, o: output, n: new memory
 # m: memory, c: cell, e: embeddings
 # v: visual input, s: sentence input
-@knet function show_and_tell(x; embed=0, vocabsize=0, decoding=true, fbias=0, o...)
+@knet function imgcap(x; embed=0, vocabsize=0, decoding=true, fbias=0, pdrop=0.5, o...)
+    # different embeddings for different input types
     if decoding
         e = wdot(x; out=embed)
     else
@@ -26,6 +27,7 @@ using Knet
 
     # word prediction
     if decoding
-        return wbf(m; out=vocabsize, f=:soft)
+        d = drop(m; pdrop=pdrop)
+        return wbf(d; out=vocabsize, f=:soft)
     end
 end
