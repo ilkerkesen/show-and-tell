@@ -61,7 +61,7 @@ function main(args)
         # save best model
         if valloss < bestloss
             bestloss = valloss
-            if o[savefile] != nothing
+            if o[:savefile] != nothing
                 save(o[:savefile], "net", clean(net))
             end
         end
