@@ -42,7 +42,7 @@ function main(args)
                       embed=o[:embed],
                       pdrop=o[:dropout])
     else
-        net = load(o[:loadfile])
+        net = load(o[:loadfile], "net")
     end
 
     # set learning rate
