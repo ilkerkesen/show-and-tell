@@ -45,22 +45,26 @@ function main(args)
         net = load(o[:loadfile])
     end
 
-    # set learning rate
     setp(net; lr=o[:lr])
+    dropout = o[:dropout] > 0.0
+    bestloss = Inf
 
     # training loop
     @printf("Training has been started...\n"); flush(STDOUT)
     for epoch = 1:o[:epochs]
-        train(net, trn, voc; gclip=o[:gclip], dropout=(o[:dropout]>0.0))
-        @printf("epoch:%d softloss:%g/%g\n", epoch,
-                test(net, trn, voc),
-                test(net, val, voc))
+        train(net, trn, voc; gclip=o[:gclip], dropout=dropout)
+        trnloss = test(net, trn, voc)
+        valloss = test(net, val, voc)
+        @printf("epoch:%d softloss:%g/%g\n", epoch, trnloss, valloss)
         flush(STDOUT)
-    end
 
-    # save trained model
-    if o[:savefile] != nothing
-        save(o[:savefile], "net", clean(net))
+        # save best model
+        if valloss < bestloss
+            bestloss = valloss
+            if o[savefile] != nothing
+                save(o[:savefile], "net", clean(net))
+            end
+        end
     end
 end
 
