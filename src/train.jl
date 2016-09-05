@@ -105,8 +105,8 @@ function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...
     N = size(txt,3)-1
 
     for j=1:N
-        ygold, cw = txt[:,:,j+1], txt[:,:,j]
-        ypred = (tst?forw:sforw)(f, cw; decoding=true, dropout=dropout)
+        ygold, x = txt[:,:,j+1], txt[:,:,j]
+        ypred = (tst?forw:sforw)(f, x; decoding=true, dropout=dropout)
         sumloss += loss(ypred, ygold; mask=msk[:,j])
         push!(ystack, (ygold, msk[:,j]))
     end
