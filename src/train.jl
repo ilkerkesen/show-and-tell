@@ -20,6 +20,7 @@ function main(args)
         ("--lr"; arg_type=Float64; default=0.2)
         ("--dropout"; arg_type=Float64; default=0.5)
         ("--gclip"; arg_type=Float64; default=5.0)
+        ("--adam"; action=:store_true')
     end
 
     # parse args
@@ -46,6 +47,7 @@ function main(args)
     end
 
     setp(net; lr=o[:lr])
+    setp(net; adam=o[:adam])
     dropout = o[:dropout] > 0.0
     bestloss = Inf
 
