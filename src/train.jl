@@ -22,11 +22,11 @@ function main(args)
         ("--dropout"; arg_type=Float64; default=0.0)
         ("--gclip"; arg_type=Float64; default=0.0)
         ("--adam"; action=:store_true)
+        ("--batchshuffle"; action=:store_true)
         ("--storebest"; action=:store_true)
     end
 
-    # print datetime
-    println("\nDatetime: ", now()); flush(STDOUT)
+    @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
 
     # parse args
     isa(args, AbstractString) && (args=split(args))
@@ -38,7 +38,7 @@ function main(args)
     shuffle!(data["trn"])
     trn, t1, m1 = @timed make_batches(data["trn"], voc, o[:batchsize])
     val, t2, m2 = @timed make_batches(data["val"], voc, o[:batchsize])
-    println("Data loaded. Minibatch operation profiling:")
+    @printf("Data loaded. Minibatch operation profiling [%s]\n", now())
     println("trn => time: ", pretty_time(t1), " mem: ", m1, " length: ", length(trn))
     println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
@@ -60,13 +60,13 @@ function main(args)
     bestloss = Inf
 
     # training loop
-    println("Training has been started."); flush(STDOUT)
+    @printf("Training has been started. [%s]\n", now()); flush(STDOUT)
     for epoch = 1:o[:epochs]
         _, epochtime = @timed train(net, trn, voc; gclip=o[:gclip], dropout=dropout)
         trnloss = test(net, trn, voc)
         valloss = test(net, val, voc)
-        @printf("epoch:%d softloss:%g/%g (time: %s)\n",
-                epoch, trnloss, valloss, pretty_time(epochtime))
+        @printf("epoch:%d softloss:%g/%g (time elapsed: %s) [%s]\n",
+                epoch, trnloss, valloss, pretty_time(epochtime), now())
         flush(STDOUT)
 
         # save model
@@ -78,6 +78,8 @@ function main(args)
                 save(o[:savefile], "net", clean(net))
             end
         end
+
+        o[:batchshuffle] && shuffle!(trn)
     end
 end
 
