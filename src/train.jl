@@ -18,9 +18,10 @@ function main(args)
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=128)
         ("--lr"; arg_type=Float64; default=0.2)
-        ("--dropout"; arg_type=Float64; default=0.5)
+        ("--dropout"; arg_type=Float64; default=0.0)
         ("--gclip"; arg_type=Float64; default=5.0)
         ("--adam"; action=:store_true)
+        ("--storebest"; action=:store_true)
     end
 
     # parse args
@@ -60,8 +61,10 @@ function main(args)
         @printf("epoch:%d softloss:%g/%g\n", epoch, trnloss, valloss)
         flush(STDOUT)
 
-        # save best model
-        if valloss < bestloss
+        # save model
+        if !o[:storebest]
+            save(o[:savefile], "net", clean(net))
+        elseif valloss < bestloss
             bestloss = valloss
             if o[:savefile] != nothing
                 save(o[:savefile], "net", clean(net))
