@@ -4,6 +4,7 @@ using JLD
 
 include("vocab.jl")
 include("model.jl")
+include("util.jl")
 
 function main(args)
     s = ArgParseSettings()
@@ -17,12 +18,15 @@ function main(args)
         ("--embed"; arg_type=Int; default=512)
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=128)
-        ("--lr"; arg_type=Float64; default=0.2)
+        ("--lr"; arg_type=Float64; default=0.001)
         ("--dropout"; arg_type=Float64; default=0.0)
-        ("--gclip"; arg_type=Float64; default=5.0)
+        ("--gclip"; arg_type=Float64; default=0.0)
         ("--adam"; action=:store_true)
         ("--storebest"; action=:store_true)
     end
+
+    # print datetime
+    println("\nDatetime: ", now()); flush(STDOUT)
 
     # parse args
     isa(args, AbstractString) && (args=split(args))
@@ -31,9 +35,11 @@ function main(args)
     # load data and generate batches
     data = load(o[:datafile])
     voc = data["voc"]
-    trn = make_batches(data["trn"], voc, o[:batchsize])
-    val = make_batches(data["val"], voc, o[:batchsize])
-    println("Data loaded...")
+    trn, t1, m1 = @timed make_batches(data["trn"], voc, o[:batchsize])
+    val, t2, m2 = @timed make_batches(data["val"], voc, o[:batchsize])
+    println("Data loaded. Minibatch operation profiling:")
+    println("trn => time: ", pretty_time(t1), " mem: ", m1, " len: ", len(trn))
+    println("val => time: ", pretty_time(t2), " mem: ", m2, " len: ", len(val))
     flush(STDOUT)
 
     # compile knet model
@@ -53,12 +59,13 @@ function main(args)
     bestloss = Inf
 
     # training loop
-    @printf("Training has been started...\n"); flush(STDOUT)
+    @printf("Training has been started."); flush(STDOUT)
     for epoch = 1:o[:epochs]
-        train(net, trn, voc; gclip=o[:gclip], dropout=dropout)
+        _, epochtime = @timed train(net, trn, voc; gclip=o[:gclip], dropout=dropout)
         trnloss = test(net, trn, voc)
         valloss = test(net, val, voc)
-        @printf("epoch:%d softloss:%g/%g\n", epoch, trnloss, valloss)
+        @printf("epoch:%d softloss:%g/%g (time: %s)\n",
+                epoch, trnloss, valloss, pretty_time(epochtime))
         flush(STDOUT)
 
         # save model
