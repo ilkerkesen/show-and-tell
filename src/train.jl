@@ -20,7 +20,7 @@ function main(args)
         ("--lr"; arg_type=Float64; default=0.2)
         ("--dropout"; arg_type=Float64; default=0.5)
         ("--gclip"; arg_type=Float64; default=5.0)
-        ("--adam"; action=:store_true')
+        ("--adam"; action=:store_true)
     end
 
     # parse args
