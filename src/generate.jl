@@ -55,8 +55,9 @@ function generate(f, sample, voc, maxlen)
     len = 1
     while word != EOS && len < maxlen
         onehot = reshape(word2onehot(voc, word), voc.size, 1)
-        ypred = convert(Array{Float32}, forw(f, onehot; decoding=true))
-        word = indmax(ypred)
+        ypred = forw(f, onehot; decoding=true)
+        ypred = convert(Array{Float32}, ypred)
+        word = index2word(voc, indmax(ypred))
         push!(sentence, word)
         len += 1
     end
