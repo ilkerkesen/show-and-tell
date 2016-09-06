@@ -153,12 +153,10 @@ function make_batches(data, voc, batchsize)
             len = length(sen)
             for j = 1:longest # sentence
                 if j <= len
-                    wi = word2index(voc, sen[j])
-                    sentences[wi, i, j] = 0x01
+                    sentences[sen[j], i, j] = 1.0
                     masks[i, j] = 0x01
                 else
-                    wi = pad2index(voc)
-                    sentences[pad2index(voc), i, j] = 0x01
+                    sentences[pad2index(voc), i, j] = 1.0
                 end
             end
         end
