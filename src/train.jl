@@ -35,11 +35,12 @@ function main(args)
     # load data and generate batches
     data = load(o[:datafile])
     voc = data["voc"]
+    shuffle!(data["trn"])
     trn, t1, m1 = @timed make_batches(data["trn"], voc, o[:batchsize])
     val, t2, m2 = @timed make_batches(data["val"], voc, o[:batchsize])
     println("Data loaded. Minibatch operation profiling:")
-    println("trn => time: ", pretty_time(t1), " mem: ", m1, " len: ", len(trn))
-    println("val => time: ", pretty_time(t2), " mem: ", m2, " len: ", len(val))
+    println("trn => time: ", pretty_time(t1), " mem: ", m1, " length: ", length(trn))
+    println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
 
     # compile knet model
@@ -59,7 +60,7 @@ function main(args)
     bestloss = Inf
 
     # training loop
-    @printf("Training has been started."); flush(STDOUT)
+    println("Training has been started."); flush(STDOUT)
     for epoch = 1:o[:epochs]
         _, epochtime = @timed train(net, trn, voc; gclip=o[:gclip], dropout=dropout)
         trnloss = test(net, trn, voc)
