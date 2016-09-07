@@ -115,10 +115,10 @@ function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...
     (tst?forw:sforw)(f, vis; decoding=false)
 
     # batch sequence length
-    N = size(txt,3)-1
+    N = size(txt)-1
 
     for j=1:N
-        ygold, x = txt[:,:,j+1], txt[:,:,j]
+        ygold, x = full(txt[j+1]), full(txt[j])
         ypred = (tst?forw:sforw)(f, x; decoding=true, dropout=dropout)
         sumloss += loss(ypred, ygold; mask=msk[:,j])
         push!(ystack, (ygold, msk[:,j]))
@@ -159,17 +159,17 @@ function make_batches(data, voc, batchsize)
         visual = mapreduce(s -> s[2], hcat, samples)
 
         # build sentences & masks tensors
-        sentences = zeros(Float32, voc.size, upper-lower+1, longest)
+        sentences = map(i -> spzeros(Float32, voc.size, upper-lower+1), [1:longest...])
         masks = zeros(Cuchar, upper-lower+1, longest)
         for i = 1:upper-lower+1 # slice
             sen = samples[i][3]
             len = length(sen)
             for j = 1:longest # sentence
                 if j <= len
-                    sentences[sen[j], i, j] = 1.0
+                    sentences[j][sen[j], i] = 1.0
                     masks[i, j] = 0x01
                 else
-                    sentences[pad2index(voc), i, j] = 1.0
+                    sentences[j][pad2index(voc), i] = 1.0
                 end
             end
         end
