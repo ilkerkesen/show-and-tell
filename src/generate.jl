@@ -73,11 +73,13 @@ function main(args)
         push!(files, open(abspath(joinpath(o[:savedir], "refs$(i).txt")), "w"))
     end
     resfile = open(abspath(joinpath(o[:savedir], "results.txt")), "w")
+    namefile = open(abspath(joinpath(o[:savedir], "filenames.txt")), "w")
 
-    for i = 1:length(keys)
-        write(resfile, string(gens[keys[i]], "\n"))
+    for i = 1:length(ks)
+        write(resfile, string(gens[ks[i]], "\n"))
+        write(namefile, string(ks[i], "\n"))
         for j = 1:sz
-            write(files[j], string(refs[keys[i]][j], "\n"))
+            write(files[j], string(refs[ks[i]][j], "\n"))
         end
     end
 
@@ -86,6 +88,7 @@ function main(args)
         close(files[i])
     end
     close(resfile)
+    close(namefile)
 
     tf = now()
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)
