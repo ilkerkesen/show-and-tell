@@ -1,3 +1,7 @@
+using CUDArt
+using GPUChecker
+CUDArt.device(first_min_used_gpu())
+
 using Knet
 using ArgParse
 using JLD
@@ -115,7 +119,7 @@ function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...
     (tst?forw:sforw)(f, vis; decoding=false)
 
     # batch sequence length
-    N = size(txt)-1
+    N = size(txt,1)-1
 
     for j=1:N
         ygold, x = full(txt[j+1]), full(txt[j])
