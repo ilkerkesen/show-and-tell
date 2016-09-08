@@ -32,10 +32,10 @@ function main(args)
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
     # checkdir
-    isdir(o[:savedir]) && (println("savedir does not exist."); flush(STDOUT); quit())
+    !isdir(o[:savedir]) && (println("savedir does not exist."); flush(STDOUT); quit())
 
     # load data
-    tst = load(o[:jsonfile], o[:datasplit])
+    tst = load(o[:datafile], o[:datasplit])
     voc = load(o[:datafile], "voc")
     net = load(o[:modelfile], "net")
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
@@ -52,7 +52,7 @@ function main(args)
         orig = vec2sen(voc, tst[i][3])
 
         !haskey(gens, fn) && (gens[fn] = gen; refs[fn] = Any[])
-        push!(refs[fn], orig]
+        push!(refs[fn], orig)
 
         if o[:debug]
             @printf("filename: %s\noriginal: %s\ngenerated: %s [%s]\n\n",
@@ -62,15 +62,17 @@ function main(args)
 
     # some validation
     ks = sort(collect(keys(refs)))
-    sz = ks[1]
+    sz = length(refs[ks[1]])
     for i = 2:length(ks)
-        ks[i] == sz || (println("Validation error!"); quit())
+        length(refs[ks[i]]) == sz || (println("Validation error! ", ks[i], " ", sz); quit())
     end
 
     # open file streams
     files = Any[]
     for i = 1:sz
-        push!(files, open(abspath(joinpath(o[:savedir], "refs$(i).txt")), "w"))
+        f = open(abspath(joinpath(o[:savedir], "refs$(i).txt")), "w")
+        println("file: ", f); flush(STDOUT)
+        push!(files, f)
     end
     resfile = open(abspath(joinpath(o[:savedir], "results.txt")), "w")
     namefile = open(abspath(joinpath(o[:savedir], "filenames.txt")), "w")
@@ -119,6 +121,6 @@ function generate(f, sample, voc, maxlen)
     return (fn, join(sentence[2:end], " "))
 end
 
-vec2sen(voc::Vocabulary, sen) = join(map(i -> index2word(voc,i), vec[2:end-1]), " ")
+vec2sen(voc::Vocabulary, vec) = join(map(i -> index2word(voc,i), vec[2:end-1]), " ")
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)
