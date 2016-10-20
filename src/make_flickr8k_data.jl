@@ -1,14 +1,15 @@
-using ArgParse, JLD, Images
+using ArgParse, JLD, Images, JSON
 
 
 function main(args)
     s = ArgParseSettings()
-    s.description = "Convert Flickr datasets to JLD format."
+    s.description = "Convert common image captioning datasets to JLD format."
 
     @add_arg_table s begin
-        ("--readfiles"; required=true; nargs=2; help="dataset input files")
-        ("--writefile"; required=true; help="output file in JLD")
-        ("--tmpdir"; required=true; help="tmp dir for file processing")
+        ("--images"; required=true; help="images archive file path")
+        ("--captions"; required=true; help="captions archive file path (karpathy)")
+        ("--savefile"; required=true; help="output file in JLD format")
+        ("--tmpdir"; default=abspath("~/tmp`"); help="tmpdir for processing")
         ("--width"; default=224; help="image width for resize operation")
         ("--means"; nargs=3; default=[123.68, 116.779, 103.939];
          help="RGB mean values for normalization")
@@ -17,27 +18,30 @@ function main(args)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
-    datafile, textfile = map(abspath, o[:readfiles])
-    splits = get_filenames(textfile) # trn, val, tst
+    imgfile = abspath(o[:images])
+    capfile = abspath(o[:captions])
+    splits = get_filenames(capfile) # trn, val, tst
     tmpdir = abspath(o[:tmpdir])
 
     # prepare tmpdir 
-    !isdir(o[:tmpdir]) && mkpath(o[:tmpdir])
+    !isdir(tmpdir) && mkpath(tmpdir)
 
     # process images
-    trnimgs, valimgs, tstimgs = map(
-        s -> map(i -> process_image(read_image(i, datafile, tmpdir), o[:width], o[:means]), s),
-        splits)
+    trn, val, tst = map(
+        s -> map(i -> (i, process_image(read_image(i, imgfile, tmpdir),
+                                        o[:width], o[:means])), s), splits)
 
     # save processed images
-    save(o[:writefile], "trnimgs", trnimgs, "valimgs", valimgs, "tstimgs", tstimgs)
+    save(o[:savefile], "trn", trn, "val", val, "tst", tst)
 end
 
 
-function get_filenames(file)
-    split(readstring(`unzip -p $file Flickr_8k.trainImages.txt`), "\n")[1:end-1],
-    split(readstring(`unzip -p $file Flickr_8k.devImages.txt`), "\n")[1:end-1],
-    split(readstring(`unzip -p $file Flickr_8k.testImages.txt`), "\n")[1:end-1]
+function get_filenames(zip)
+    zip = abspath(zip)
+    file = joinpath(split(splitdir(abspath(zip))[2], ".")[1], "dataset.json")
+    images = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
+    map(s -> map(j -> j["filename"], filter(i -> i["split"] == s, images)),
+        ["train", "val", "test"])
 end
 
 
