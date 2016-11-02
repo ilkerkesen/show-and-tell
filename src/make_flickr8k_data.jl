@@ -50,7 +50,7 @@ function read_image(file, zip, tmp)
     target = joinpath(tmp, file)
     img = readstring(`unzip -p $zip Flicker8k_Dataset/$file`)
     write(target, img)
-    img = load(abspath(joinpath(tmp, file)))
+    img = load(target)
     rm(target)
     return img
 end
