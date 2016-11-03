@@ -28,11 +28,16 @@ function main(args)
 
     # process images
     trn, val, tst = map(
-        s -> map(i -> (i, process_image(read_image(i, imgfile, tmpdir),
-                                        o[:width], o[:means])), s), splits)
+        s -> map(i -> process_image(read_image(i, imgfile, tmpdir),
+                                        o[:width], o[:means]), s), splits)
 
-    # save processed images
-    save(o[:savefile], "trn", trn, "val", val, "tst", tst)
+    # compose filenames and images and save processed data
+    data = Dict(
+        "trn" => Dict("filenames" => splits[1], "images" => trn),
+        "val" => Dict("filenames" => splits[2], "images" => val),
+        "tst" => Dict("filenames" => splits[3], "images" => tst)
+    )
+    save(o[:savefile], "data", trn, "val", val, "tst", tst)
 end
 
 
