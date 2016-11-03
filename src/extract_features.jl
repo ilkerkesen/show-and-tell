@@ -40,7 +40,7 @@ function split_feature_extraction(data, bs, model)
     ns = length(data) # number of samples
     nb = Int(ceil(ns/bs)) # number of batches
     rvecs2array(A) = map(i -> A[i,:], 1:size(A,1))
-    nth_batch(data, n) = n != ns ? data[(n-1)*bs:n*bs] : data[(n-1)*bs:end]
+    nth_batch(data, n) = n != ns ? data[(n-1)*bs+1:n*bs] : data[(n-1)*bs+1:end]
     extract_features = get_feature_extractor(model...)
     features = []
     
