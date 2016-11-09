@@ -9,10 +9,9 @@ function main(args)
         ("--images"; required=true; help="images archive file path")
         ("--captions"; required=true; help="captions archive file path (karpathy)")
         ("--savefile"; required=true; help="output file in JLD format")
-        ("--tmpdir"; default=abspath("~/tmp`"); help="tmpdir for processing")
-        ("--width"; default=224; help="image width for resize operation")
-        ("--means"; nargs=3; default=[123.68, 116.779, 103.939];
-         help="RGB mean values for normalization")
+        ("--tmpdir"; default=abspath("~/tmp"); help="tmpdir for processing")
+        ("--imsize"; arg_type=Int64; nargs=2; default=[224,224];
+         help="new image sizes")
     end
 
     isa(args, AbstractString) && (args=split(args))
@@ -22,6 +21,7 @@ function main(args)
     capfile = abspath(o[:captions])
     splits = get_filenames(capfile) # trn, val, tst
     tmpdir = abspath(o[:tmpdir])
+    imsize = tuple(o[:imsize]...)
 
     # prepare tmpdir 
     !isdir(tmpdir) && mkpath(tmpdir)
@@ -29,7 +29,7 @@ function main(args)
     # process images
     trn, val, tst = map(
         s -> map(i -> process_image(read_image(i, imgfile, tmpdir),
-                                        o[:width], o[:means]), s), splits)
+                                        imsize), s), splits)
 
     # compose filenames and images and save processed data
     data = Dict(
@@ -37,7 +37,7 @@ function main(args)
         "val" => Dict("filenames" => splits[2], "images" => val),
         "tst" => Dict("filenames" => splits[3], "images" => tst)
     )
-    save(o[:savefile], "data", trn, "val", val, "tst", tst)
+    save(o[:savefile], "data", data)
 end
 
 
@@ -61,18 +61,13 @@ function read_image(file, zip, tmp)
 end
 
 
-function process_image(img, width, means)
-    means = reshape(means, 1, 1, 3)
-    mn = ntuple(i->div(size(img,i)*width,minimum(size(img))),2) # new size
-    a1 = Images.imresize(img, mn) # resize image
-    i1 = div(size(a1,1)-width,2)
-    j1 = div(size(a1,2)-width,2)
-    b1 = a1[i1+1:i1+224,j1+1:j1+224] # center cropping
-    c1 = separate(b1) # separate image channels, build a tensor
-    d1 = convert(Array{Float32}, c1) # type conversion
-    e1 = reshape(d1[:,:,1:3], (width,width,3,1)) # reshape
-    f1 = (255 * e1 .- means) # 8bit representation+normalization
-    return permutedims(f1, [2,1,3,4]) # transpose
+function process_image(img, newsize)
+    a1 = Images.imresize(img, newsize) # resize image
+    b1 = separate(a1) # separate image channels, build a tensor
+    c1 = convert(Array{Float32}, b1) # type conversion
+    d1 = reshape(c1[:,:,1:3], (newsize[1],newsize[2],3,1)) # reshape
+    e1 = (255 * d1) # 8bit image representation
+    return permutedims(e1, [2,1,3,4]) # transpose
 end
 
 
