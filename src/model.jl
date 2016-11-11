@@ -1,33 +1,69 @@
-using Knet
+function lstm(weight, bias, hidden, cell, input; encoding=false)
+    gates   = hcat(input,hidden) * weight .+ bias;
+    hsize   = size(hidden,2);
+    forget  = sigm(gates[:,1:hsize]);
+    ingate  = sigm(gates[:,1+hsize:2hsize]);
+    outgate = sigm(gates[:,1+2hsize:3hsize]);
+    change  = tanh(gates[:,1+3hsize:end]);
+    cell    = cell .* forget + ingate .* change;
+    hidden  = outgate .* tanh(cell);
+    return (hidden,cell)
+end
 
-# Show and Tell: A Neural Image Caption Generator
-# Model: Encoder -> CNN (VGG), Decoder -> RNN (LSTM)
-#
-# using same notation in the paper
-# i: input, f: forget, o: output, n: new memory
-# m: memory, c: cell, e: embeddings
-# v: visual input, s: sentence input
-@knet function imgcap(x; embed=0, vocabsize=0, decoding=true, fbias=0, pdrop=0.5, o...)
-    # different embeddings for different input types
-    if decoding
-        e = wdot(x; out=embed)
-    else
-        e = wdot(x; out=embed)
+# w[1] & w[2] => weight and bias params for LSTM network
+# w[3] & w[4] => weight and bias params for softmax layer
+# w[5] & w[6] => weights for visual and textual embeddings
+# s[1] & s[2] => hidden state and cell state of LSTM net
+function loss(w, s, vis, seq)
+    total = 0.0;
+    count = 0;
+    atype = typeof(AutoGrad.getval(w[1]));
+
+    # visual features
+    x = convert(atype, vis)
+    x =  x * w[5];
+    (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
+
+    # textual features
+    x = convert(atype, seq[1]);
+    for i = 1:length(seq)-1
+        x = x * w[6];
+        (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
+        ypred = logp(s[1] * w[3] .+ w[4], 2);
+        ygold = convert(atype, seq[i+1]);
+        total += sum(ygold .* ypred);
+        count += size(ygold, 1);
+        x = ygold;
     end
 
-    # LSTM, embeddings as input
-    i = wbf2(e,m; o..., f=:sigm)
-    f = wbf2(e,m; o..., f=:sigm, binit=Constant(fbias))
-    o = wbf2(e,m; o..., f=:sigm)
-    n = wbf2(e,m; o..., f=:tanh)
+    return -total / count;
+end
 
-    # note that, tanh operation performed above
-    c = c .* f + i .* n
-    m  = c .* o
 
-    # word prediction
-    if decoding
-        d = drop(m; pdrop=pdrop)
-        return wbf(d; out=vocabsize, f=:soft)
-    end
+lossgradient = grad(loss)
+
+
+function initweights(atype, hidden, visual, vocab, embed, winit)
+    w = Array(Any, 5);
+    input = embed;
+
+    # LSTM weights
+    w[1] = winit*randn(input+hidden, 4*hidden);
+    w[2] = zeros(1, 4*hidden);
+
+    # Softmax weights
+    w[3] = winit*randn(hidden, vocab);
+    w[4] = zeros(1, vocab);
+
+    # embedding weights
+    w[5] = winit*randn(visual, embed);
+    w[6] = winit*randn(vocab, embed);
+end
+
+
+function initstate(atype, hidden, batchsize)
+    state = Array(Any, 2);
+    state[1] = zeros(batchsize, hidden);
+    state[2] = zeros(batchsize, hidden);
+    return map(s->convert(atype,s), state);
 end

@@ -1,33 +1,33 @@
-using CUDArt
-using GPUChecker
-CUDArt.device(first_min_used_gpu())
-
 using Knet
 using ArgParse
 using JLD
 
 include("vocab.jl")
 include("model.jl")
+include("batch.jl")
 include("util.jl")
 
 function main(args)
     s = ArgParseSettings()
-    s.description = "Show and Tell: A Neural Image Caption Generator implementation by Ilker Kesen, 2016. Karpathy's data used."
+    s.description = string(
+        "Show and Tell: A Neural Image Caption Generator",
+        " Knet implementation by Ilker Kesen [ikesen16_at_ku.edu.tr], 2016.")
 
     @add_arg_table s begin
         ("--datafile"; help="data file contains dataset splits and vocabulary")
         ("--loadfile"; default=nothing; help="pretrained model file if any")
         ("--savefile"; default=nothing; help="model save file after train")
+        ("--nogpu"; action=:store_true)
         ("--hidden"; arg_type=Int; default=512)
         ("--embed"; arg_type=Int; default=512)
+        ("--winit"; arg_type=Float32; default=0.01)
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=128)
-        ("--lr"; arg_type=Float64; default=0.001)
-        ("--dropout"; arg_type=Float64; default=0.0)
-        ("--gclip"; arg_type=Float64; default=0.0)
-        ("--adam"; action=:store_true)
+        ("--lr"; arg_type=Float32; default=2.0)
+        ("--gclip"; arg_type=Float32; default=5.0)
+        ("--seed"; arg_type=Int; default=1)
+        ("--gradcheck"; action=:store_true)
         ("--batchshuffle"; action=:store_true)
-        ("--storebest"; action=:store_true)
     end
 
     @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
@@ -36,10 +36,12 @@ function main(args)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
-    # load data and generate batches
+    # load data
     data = load(o[:datafile])
     voc = data["voc"]
     shuffle!(data["trn"])
+
+    # generate minibatches
     trn, t1, m1 = @timed make_batches(data["trn"], voc, o[:batchsize])
     val, t2, m2 = @timed make_batches(data["val"], voc, o[:batchsize])
     @printf("Data loaded. Minibatch operation profiling [%s]\n", now())
@@ -47,43 +49,37 @@ function main(args)
     println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
 
-    # compile knet model
+    # TODO: get visual features size here
+    atype = !o[:nogpu] ? KnetArray : Float32
+    visual = nothing;
+    vocabsize = voc.size
+    
+    # initialize state & weights
+    s = initstate(atype, o[:hidden], o[:batchsize])
     if o[:loadfile] == nothing
-        net = compile(:imgcap;
-                      out=o[:hidden],
-                      vocabsize=voc.size,
-                      embed=o[:embed],
-                      pdrop=o[:dropout])
+        w = initweights(atype, o[:hidden], visual, vocabsize, o[:embed], o[:winit])
     else
-        net = load(o[:loadfile], "net")
+        w = load(o[:loadfile], "weights")
     end
 
-    setp(net; lr=o[:lr])
-    setp(net; adam=o[:adam])
-    dropout = o[:dropout] > 0.0
+    # training
     bestloss = Inf
-
-    # training loop
     @printf("Training has been started. [%s]\n", now()); flush(STDOUT)
+
     for epoch = 1:o[:epochs]
-        _, epochtime = @timed train(net, trn, voc; gclip=o[:gclip], dropout=dropout)
+        _, epochtime = @timed train(net, trn, voc; gclip=o[:gclip])
         trnloss = test(net, trn, voc)
         valloss = test(net, val, voc)
         @printf("epoch:%d softloss:%g/%g (time elapsed: %s) [%s]\n",
                 epoch, trnloss, valloss, pretty_time(epochtime), now())
         flush(STDOUT)
 
-        # save model
-        if !o[:storebest]
-            save(o[:savefile], "net", clean(net))
-        elseif valloss < bestloss
-            bestloss = valloss
-            if o[:savefile] != nothing
-                save(o[:savefile], "net", clean(net))
-            end
-        end
-
+        # shuffle batches
         o[:batchshuffle] && shuffle!(trn)
+
+        # save model
+        valloss > bestloss || o[:savefile] == nothing || continue
+        bestloss = valloss; save(o[:savefile], "weights", karr2arr(w))
     end
 end
 
@@ -143,45 +139,6 @@ function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...
     reset!(f; keepstate=true)
 end
 
-
-# generate minibatches
-function make_batches(data, voc, batchsize)
-    nsamples = length(data)
-    nbatches = div(nsamples, batchsize)
-    batches = Any[]
-
-    for n = 1:nbatches
-        lower = (n-1)*batchsize+1
-        upper = min(lower+batchsize-1, nsamples)
-        samples = data[lower:upper]
-        longest = mapreduce(s -> length(s[3]), max, samples)
-
-        # filenames
-        fs = map(s -> s[1], samples)
-
-        # visual features concat
-        visual = mapreduce(s -> s[2], hcat, samples)
-
-        # build sentences & masks tensors
-        sentences = map(i -> spzeros(Float32, voc.size, upper-lower+1), [1:longest...])
-        masks = zeros(Cuchar, upper-lower+1, longest)
-        for i = 1:upper-lower+1 # slice
-            sen = samples[i][3]
-            len = length(sen)
-            for j = 1:longest # sentence
-                if j <= len
-                    sentences[j][sen[j], i] = 1.0
-                    masks[i, j] = 0x01
-                else
-                    sentences[j][pad2index(voc), i] = 1.0
-                end
-            end
-        end
-
-        push!(batches, (fs, visual, sentences, masks))
-    end
-
-    return batches
-end
+karr2arr(ws) = map(w -> convert(Array{Float32}, w), ws);
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)
