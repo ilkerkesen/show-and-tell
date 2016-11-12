@@ -21,7 +21,7 @@ function main(args)
 
     # load data
     @printf("Data and model loading... "); flush(STDOUT)
-    data = load(o[:input])["data"]
+    data = load(o[:input])
     bs, ll = o[:batchsize], o[:lastlayer]
     CNN = matread(o[:model])
     model = weights(CNN; last_layer=ll)
@@ -39,8 +39,11 @@ function main(args)
 
     # save features
     @printf("Save extracted features to output file... "); flush(STDOUT)
-    save(o[:output], "data", newdata)
-    @printf("Done.\n")
+    save(o[:output],
+         "trn", newdata["trn"],
+         "val", newdata["val"],
+         "tst", newdata["tst"])
+    @printf("Done.\n"); flush(STDOUT)
 end
 
 

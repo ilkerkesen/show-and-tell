@@ -49,9 +49,8 @@ function main(args)
     println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
 
-    # TODO: get visual features size here
     atype = !o[:nogpu] ? KnetArray : Float32
-    visual = nothing;
+    visual = size(trn[1][2], 2);
     vocabsize = voc.size
     
     # initialize state & weights
@@ -67,78 +66,56 @@ function main(args)
     @printf("Training has been started. [%s]\n", now()); flush(STDOUT)
 
     for epoch = 1:o[:epochs]
-        _, epochtime = @timed train(net, trn, voc; gclip=o[:gclip])
-        trnloss = test(net, trn, voc)
-        valloss = test(net, val, voc)
+        _, epochtime = @timed train!(w, s, trn; lr=o[:lr], gclip=o[:gclip])
+        losstrn = test(w, s, trn)
+        lossval = test(w, s, val)
         @printf("epoch:%d softloss:%g/%g (time elapsed: %s) [%s]\n",
-                epoch, trnloss, valloss, pretty_time(epochtime), now())
+                epoch, losstrn, lossval, pretty_time(epochtime), now())
         flush(STDOUT)
 
         # shuffle batches
         o[:batchshuffle] && shuffle!(trn)
 
         # save model
-        valloss > bestloss || o[:savefile] == nothing || continue
-        bestloss = valloss; save(o[:savefile], "weights", karr2arr(w))
+        lossval > bestloss || o[:savefile] == nothing || continue
+        bestloss = lossval; save(o[:savefile], "weights", karr2arr(w))
     end
 end
-
 
 # one epoch training
-function train(f, data, voc; o...)
+function train!(w, s, data; lr=1.0, gclip=0.0)
     for batch in data
-        iter(f, batch; o...)
+        train!(w, s, batch; lr=lr, gclip=gclip)
     end
 end
 
-
-# one epoch forw pass
-function test(f, data, voc; o...)
-    sumloss, numloss = 0.0, 0
-    for batch in data
-        l = iter(f, batch; tst=true, o...)
-        sumloss += l
-        numloss += 1
+# one minibatch training
+function batch_train!(w, s, batch; lr=1.0, gclip=0.0)
+    _, vis, seq = batch
+    gloss = lossgradient(w, s, vis, seq);
+    gnorm = lr
+    if glip > 0
+        gnorm = sqrt(mapreduce(sumab2, +, 0, gloss))
+        gnorm > gclip && gscale *= gclip / gnorm
     end
-    return sumloss/numloss
+
+    for k in 1:length(w)
+        axpy!(-gscale, gloss[k], w[k])
+    end
+
+    isa(state,Vector{Any}) || error("State should not be Boxed.")
+    for i = 1:length(state)
+        state[i] = AutoGrad.getval(state[i])
+    end
 end
 
+# one epoch testing
+test(w, s, data) = map(batch -> batch_test(w, s, batch), data)
 
-# iteration for one batch forw/back
-function iter(f, batch; loss=softloss, gclip=0.0, tst=false, dropout=false, o...)
-    reset!(f)
-    ystack = Any[]
-    sumloss = 0.0
-    _, vis, txt, msk = batch
+# one minibatch testing
+batch_test(w, s, batch) = loss(w, s, batch[2], batch[3])
 
-    # CNN features input
-    (tst?forw:sforw)(f, vis; decoding=false)
-
-    # batch sequence length
-    N = size(txt,1)-1
-
-    for j=1:N
-        ygold, x = full(txt[j+1]), full(txt[j])
-        ypred = (tst?forw:sforw)(f, x; decoding=true, dropout=dropout)
-        sumloss += loss(ypred, ygold; mask=msk[:,j])
-        push!(ystack, (ygold, msk[:,j]))
-    end
-
-    if tst
-        return sumloss/N
-    end
-
-    # backprop
-    while !isempty(ystack)
-        ygold, mask = pop!(ystack)
-        sback(f, ygold, loss; mask=mask)
-    end
-
-    sback(f, nothing, loss)
-    update!(f; gclip=gclip)
-    reset!(f; keepstate=true)
-end
-
+# Knet array to Float32 array conversion
 karr2arr(ws) = map(w -> convert(Array{Float32}, w), ws);
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

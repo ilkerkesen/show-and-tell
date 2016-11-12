@@ -1,3 +1,30 @@
+# initialize hidden and cell arrays
+function initstate(atype, hidden, batchsize)
+    state = Array(Any, 2);
+    state[1] = zeros(batchsize, hidden);
+    state[2] = zeros(batchsize, hidden);
+    return map(s->convert(atype,s), state);
+end
+
+
+# initialize all weights of the whole network
+# w[1] & w[2] => weight and bias params for LSTM network
+# w[3] & w[4] => weight and bias params for softmax layer
+# w[5] & w[6] => weights for visual and textual embeddings
+# s[1] & s[2] => hidden state and cell state of LSTM net
+function initweights(atype, hidden, visual, vocab, embed, winit)
+    w = Array(Any, 5);
+    input = embed;
+    w[1] = winit*randn(input+hidden, 4*hidden);
+    w[2] = zeros(1, 4*hidden);
+    w[3] = winit*randn(hidden, vocab);
+    w[4] = zeros(1, vocab);
+    w[5] = winit*randn(visual, embed);
+    w[6] = winit*randn(vocab, embed);
+end
+
+
+# LSTM model - input * weight, concatenated weights
 function lstm(weight, bias, hidden, cell, input; encoding=false)
     gates   = hcat(input,hidden) * weight .+ bias;
     hsize   = size(hidden,2);
@@ -10,10 +37,7 @@ function lstm(weight, bias, hidden, cell, input; encoding=false)
     return (hidden,cell)
 end
 
-# w[1] & w[2] => weight and bias params for LSTM network
-# w[3] & w[4] => weight and bias params for softmax layer
-# w[5] & w[6] => weights for visual and textual embeddings
-# s[1] & s[2] => hidden state and cell state of LSTM net
+# loss function for whole network
 function loss(w, s, vis, seq)
     total = 0.0;
     count = 0;
@@ -41,29 +65,3 @@ end
 
 
 lossgradient = grad(loss)
-
-
-function initweights(atype, hidden, visual, vocab, embed, winit)
-    w = Array(Any, 5);
-    input = embed;
-
-    # LSTM weights
-    w[1] = winit*randn(input+hidden, 4*hidden);
-    w[2] = zeros(1, 4*hidden);
-
-    # Softmax weights
-    w[3] = winit*randn(hidden, vocab);
-    w[4] = zeros(1, vocab);
-
-    # embedding weights
-    w[5] = winit*randn(visual, embed);
-    w[6] = winit*randn(vocab, embed);
-end
-
-
-function initstate(atype, hidden, batchsize)
-    state = Array(Any, 2);
-    state[1] = zeros(batchsize, hidden);
-    state[2] = zeros(batchsize, hidden);
-    return map(s->convert(atype,s), state);
-end

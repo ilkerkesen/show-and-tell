@@ -1,7 +1,7 @@
-SOS = "#SOS#" # start of sentence token
-EOS = "#EOS#" # end of sentence token 
-PAD = "#PAD#" # padding token
-UNK = "#UNK#" # token for unknown words
+SOS = "<sos>" # start of sentence token
+EOS = "<eos>" # end of sentence token
+PAD = "<pad>" # padding token
+UNK = "<unk>" # token for unknown words
 
 type Vocabulary
     counts # word counts dict
@@ -10,7 +10,7 @@ type Vocabulary
     i2w # index to word array
     size # vocabulary size, total different words count
 
-    function Vocabulary(words::Array{Any,1}, MIN_OCCUR=5)
+    function Vocabulary(words::Array{Any,1}; MIN_OCCUR=5)
         # get word counts
         counts = Dict()
         for word in words

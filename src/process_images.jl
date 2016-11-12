@@ -32,12 +32,10 @@ function main(args)
                                         imsize), s), splits)
 
     # compose filenames and images and save processed data
-    data = Dict(
-        "trn" => Dict("filenames" => splits[1], "images" => trn),
-        "val" => Dict("filenames" => splits[2], "images" => val),
-        "tst" => Dict("filenames" => splits[3], "images" => tst)
-    )
-    save(o[:savefile], "data", data)
+    trn = Dict("filenames" => splits[1], "images" => trn)
+    val = Dict("filenames" => splits[2], "images" => val)
+    tst = Dict("filenames" => splits[3], "images" => tst)
+    save(o[:savefile], "trn", trn, "val", val, "tst", tst)
 end
 
 
