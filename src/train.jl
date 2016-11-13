@@ -20,11 +20,11 @@ function main(args)
         ("--nogpu"; action=:store_true)
         ("--hidden"; arg_type=Int; default=512)
         ("--embed"; arg_type=Int; default=512)
-        ("--winit"; arg_type=Float32; default=0.01)
+        ("--winit"; arg_type=Float32; default=Float32(0.01))
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=128)
-        ("--lr"; arg_type=Float32; default=2.0)
-        ("--gclip"; arg_type=Float32; default=5.0)
+        ("--lr"; arg_type=Float32; default=Float32(2.0))
+        ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1)
         ("--gradcheck"; action=:store_true)
         ("--batchshuffle"; action=:store_true)
@@ -49,7 +49,7 @@ function main(args)
     println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
 
-    atype = !o[:nogpu] ? KnetArray : Float32
+    atype = !o[:nogpu] ? KnetArray{Float32} : Float32
     visual = size(trn[1][2], 2);
     vocabsize = voc.size
     
@@ -85,7 +85,7 @@ end
 # one epoch training
 function train!(w, s, data; lr=1.0, gclip=0.0)
     for batch in data
-        train!(w, s, batch; lr=lr, gclip=gclip)
+        batch_train!(w, s, batch; lr=lr, gclip=gclip)
     end
 end
 
@@ -93,24 +93,26 @@ end
 function batch_train!(w, s, batch; lr=1.0, gclip=0.0)
     _, vis, seq = batch
     gloss = lossgradient(w, s, vis, seq);
-    gnorm = lr
-    if glip > 0
-        gnorm = sqrt(mapreduce(sumab2, +, 0, gloss))
-        gnorm > gclip && gscale *= gclip / gnorm
+    gscale = lr
+    if gclip > 0
+        gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
+        if gnorm > gclip
+            gscale *= gclip / gnorm
+        end
     end
 
     for k in 1:length(w)
         axpy!(-gscale, gloss[k], w[k])
     end
 
-    isa(state,Vector{Any}) || error("State should not be Boxed.")
-    for i = 1:length(state)
-        state[i] = AutoGrad.getval(state[i])
+    isa(s,Vector{Any}) || error("State should not be Boxed.")
+    for i = 1:length(s)
+        s[i] = AutoGrad.getval(s[i])
     end
 end
 
 # one epoch testing
-test(w, s, data) = map(batch -> batch_test(w, s, batch), data)
+test(w, s, data) = mean(map(batch -> batch_test(w, s, batch), data))
 
 # one minibatch testing
 batch_test(w, s, batch) = loss(w, s, batch[2], batch[3])

@@ -27,7 +27,7 @@ function make_batches(data, voc, batchsize)
             end
         end
 
-        push!(batches, (fs, visual, sentences))
+        push!(batches, (fs, visual', map(transpose, sentences)))
     end
 
     return batches

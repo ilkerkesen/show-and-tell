@@ -13,7 +13,7 @@ end
 # w[5] & w[6] => weights for visual and textual embeddings
 # s[1] & s[2] => hidden state and cell state of LSTM net
 function initweights(atype, hidden, visual, vocab, embed, winit)
-    w = Array(Any, 5);
+    w = Array(Any, 6);
     input = embed;
     w[1] = winit*randn(input+hidden, 4*hidden);
     w[2] = zeros(1, 4*hidden);
@@ -21,6 +21,7 @@ function initweights(atype, hidden, visual, vocab, embed, winit)
     w[4] = zeros(1, vocab);
     w[5] = winit*randn(visual, embed);
     w[6] = winit*randn(vocab, embed);
+    return map(atype, w)
 end
 
 
