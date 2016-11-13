@@ -1,7 +1,3 @@
-using GPUChecker
-using CUDArt
-CUDArt.device(first_min_used_gpu())
-
 using Knet
 using ArgParse
 using JLD
@@ -38,7 +34,6 @@ function main(args)
     # load data
     tst = load(o[:datafile], o[:datasplit])
     voc = load(o[:datafile], "voc")
-    net = load(o[:modelfile], "weights")
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
 
     o[:testing] && o[:shuffle] && shuffle!(tst)
@@ -46,11 +41,14 @@ function main(args)
     refs, gens = Dict(), Dict()
     counter, ti = 0, now()
     atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
+    w = map(i->convert(atype, i), load(o[:modelfile], "weights"));
+    s = initstate(atype, size(w[3], 1), 1)
 
     # generate captions
     for i = 1:length(tst)
-        o[:testing] && counter > o[:amount] && break
-        gen = generate(atype, w, s, tst[i][2], voc, o[:maxlen])
+        o[:testing] && counter >= o[:amount] && break
+        gen = generate(atype, w, copy(s), tst[i][2], voc, o[:maxlen])
+        fn = tst[i][1]
         orig = vec2sen(voc, tst[i][3])
 
         !haskey(gens, fn) && (gens[fn] = gen; refs[fn] = Any[])
@@ -63,6 +61,8 @@ function main(args)
         counter += 1
     end
 
+    o[:testing] && return
+    
     # some validation
     ks = sort(collect(keys(refs)))
     sz = length(refs[ks[1]])
@@ -127,7 +127,7 @@ function generate(atype, w, s, vis, voc, maxlen)
         pop!(sentence)
     end
 
-    return (fn, join(sentence[2:end], " "))
+    return join(sentence[2:end], " ")
 end
 
 vec2sen(voc::Vocabulary, vec) = join(map(i -> index2word(voc,i), vec[2:end-1]), " ")
