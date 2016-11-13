@@ -64,5 +64,4 @@ function loss(w, s, vis, seq)
     return -total / count;
 end
 
-
 lossgradient = grad(loss)

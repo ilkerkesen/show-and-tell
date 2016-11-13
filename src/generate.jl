@@ -19,6 +19,7 @@ function main(args)
         ("--savedir"; help="save generations and references")
         ("--datasplit"; default="tst"; help="data split is going to be used")
         ("--maxlen"; arg_type=Int; default=20; help="max sentence length")
+        ("--nogpu"; action=:store_true)
         ("--testing"; action=:store_true)
         ("--shuffle"; action=:store_true)
         ("--debug"; action=:store_true)
@@ -37,18 +38,19 @@ function main(args)
     # load data
     tst = load(o[:datafile], o[:datasplit])
     voc = load(o[:datafile], "voc")
-    net = load(o[:modelfile], "net")
+    net = load(o[:modelfile], "weights")
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
 
     o[:testing] && o[:shuffle] && shuffle!(tst)
 
     refs, gens = Dict(), Dict()
     counter, ti = 0, now()
+    atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
 
     # generate captions
     for i = 1:length(tst)
         o[:testing] && counter > o[:amount] && break
-        fn, gen = generate(net, tst[i], voc, o[:maxlen])
+        gen = generate(atype, w, s, tst[i][2], voc, o[:maxlen])
         orig = vec2sen(voc, tst[i][3])
 
         !haskey(gens, fn) && (gens[fn] = gen; refs[fn] = Any[])
@@ -58,6 +60,7 @@ function main(args)
             @printf("filename: %s\noriginal: %s\ngenerated: %s [%s]\n\n",
                     fn, orig, gen, now()); flush(STDOUT)
         end
+        counter += 1
     end
 
     # some validation
@@ -96,18 +99,24 @@ function main(args)
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)
 end
 
-function generate(f, sample, voc, maxlen)
-    reset!(f)
-    fn, vis, vec = sample
-    vis = reshape(vis, length(vis), 1)
-    forw(f, vis; decoding=false)
+
+function generate(atype, w, s, vis, voc, maxlen)
+    # feed visual features
+    x = reshape(vis, 1, length(vis))
+    x = convert(atype, x)
+    x = x * w[5]
+    (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x)
+
+    # language generation
     word = SOS
     sentence = Any[word]
-
     len = 1
+
     while word != EOS && len < maxlen
-        onehot = reshape(word2onehot(voc, word), voc.size, 1)
-        ypred = forw(f, onehot; decoding=true)
+        x = reshape(word2onehot(voc, word), 1, voc.size)
+        x = convert(atype, x) * w[6]
+        (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
+        ypred = logp(s[1] * w[3] .+ w[4], 2)
         ypred = convert(Array{Float32}, ypred)
         word = index2word(voc, indmax(ypred))
         push!(sentence, word)

@@ -54,11 +54,12 @@ function main(args)
     vocabsize = voc.size
     
     # initialize state & weights
-    s = initstate(atype, o[:hidden], o[:batchsize])
     if o[:loadfile] == nothing
         w = initweights(atype, o[:hidden], visual, vocabsize, o[:embed], o[:winit])
+        s = initstate(atype, o[:hidden], o[:batchsize])
     else
-        w = load(o[:loadfile], "weights")
+        w = map(i->convert(atype, i), load(o[:loadfile], "weights"));
+        s = initstate(atype, size(w[3], 1), o[:batchsize])
     end
 
     # training
@@ -77,7 +78,7 @@ function main(args)
         o[:batchshuffle] && shuffle!(trn)
 
         # save model
-        lossval > bestloss || o[:savefile] == nothing || continue
+        o[:savefile] != nothing && lossval < bestloss || continue
         bestloss = lossval; save(o[:savefile], "weights", karr2arr(w))
     end
 end
