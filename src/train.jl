@@ -49,7 +49,7 @@ function main(args)
     println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
 
-    atype = !o[:nogpu] ? KnetArray{Float32} : Float32
+    atype = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     visual = size(trn[1][2], 2);
     vocabsize = voc.size
     

@@ -21,7 +21,7 @@ function initweights(atype, hidden, visual, vocab, embed, winit)
     w[4] = zeros(1, vocab);
     w[5] = winit*randn(visual, embed);
     w[6] = winit*randn(vocab, embed);
-    return map(atype, w)
+    return map(i->convert(atype, i), w)
 end
 
 
