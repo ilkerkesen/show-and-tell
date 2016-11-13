@@ -35,6 +35,7 @@ function main(args)
     # parse args
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+    o[:seed] > 0 && srand(o[:seed])
 
     # load data
     data = load(o[:datafile])
@@ -86,7 +87,7 @@ end
 # one epoch training
 function train!(w, s, data; lr=1.0, gclip=0.0)
     for batch in data
-        batch_train!(w, s, batch; lr=lr, gclip=gclip)
+        batch_train!(w, copy(s), batch; lr=lr, gclip=gclip)
     end
 end
 
