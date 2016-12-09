@@ -27,7 +27,7 @@ function main(args)
     !isdir(tmpdir) && mkpath(tmpdir)
 
     # process images
-    trn, val, tst = map(
+    trn, restval, val, tst = map(
         s -> map(i -> process_image(read_image(i, imgfile, tmpdir),
                                         imsize), s), splits)
 
@@ -35,7 +35,7 @@ function main(args)
     trn = Dict("filenames" => splits[1], "images" => trn)
     val = Dict("filenames" => splits[2], "images" => val)
     tst = Dict("filenames" => splits[3], "images" => tst)
-    save(o[:savefile], "trn", trn, "val", val, "tst", tst)
+    save(o[:savefile], "train", trn, "restval" restval, "val", val, "test", tst)
 end
 
 
@@ -44,7 +44,7 @@ function get_filenames(zip)
     file = joinpath(split(splitdir(abspath(zip))[2], ".")[1], "dataset.json")
     images = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
     map(s -> map(j -> j["filename"], filter(i -> i["split"] == s, images)),
-        ["train", "val", "test"])
+        ["train", "restval", "val", "test"])
 end
 
 

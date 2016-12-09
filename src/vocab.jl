@@ -9,8 +9,9 @@ type Vocabulary
     w2i # word to index dict
     i2w # index to word array
     size # vocabulary size, total different words count
+    min_occur # minimum occurence
 
-    function Vocabulary(words::Array{Any,1}; MIN_OCCUR=5)
+    function Vocabulary(words::Array{Any,1}, min_occur)
         # get word counts
         counts = Dict()
         for word in words
@@ -22,7 +23,7 @@ type Vocabulary
         end
 
         # filter less occured words, build word2index dict upon that collection
-        counts = filter((w,o) -> o >= MIN_OCCUR , counts)
+        counts = filter((w,o) -> o >= min_occur , counts)
         sorted = sort(collect(counts), by = tuple -> last(tuple), rev=true)
         w2i = Dict(SOS => 1)
 
@@ -42,7 +43,7 @@ type Vocabulary
             i2w[v] = k
         end
 
-        new(counts, sorted, w2i, i2w, i+2)
+        new(counts, sorted, w2i, i2w, i+2, min_occur)
     end
 end
 
