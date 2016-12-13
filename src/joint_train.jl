@@ -1,6 +1,8 @@
 using Knet
 using ArgParse
 using JLD
+using MAT
+using AutoGrad
 
 include("vocab.jl")
 include("model.jl")
@@ -15,7 +17,8 @@ function main(args)
         " Knet implementation by Ilker Kesen [ikesen16_at_ku.edu.tr], 2016.")
 
     @add_arg_table s begin
-        ("--datafile"; help="data file contains dataset splits and vocabulary")
+        ("--images"; help="data file contains image data in JLD format")
+        ("--captions"; help="data file contains language data in JLD format")
         ("--loadfile"; default=nothing; help="pretrained model file if any")
         ("--savefile"; default=nothing; help="model save file after train")
         ("--cnnfile"; default=nothing; help="pretrained CNN model file")
@@ -24,15 +27,16 @@ function main(args)
         ("--embed"; arg_type=Int; default=512)
         ("--winit"; arg_type=Float32; default=Float32(0.01))
         ("--epochs"; arg_type=Int; default=1)
-        ("--batchsize"; arg_type=Int; default=10)
+        ("--batchsize"; arg_type=Int; default=16)
         ("--lr"; arg_type=Float32; default=Float32(2.0))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1)
-        ("--gradcheck"; action=:store_true)
+        ("--gcheck"; action=:store_true; help="gradient checking")
         ("--batchshuffle"; action=:store_true)
-        ("--fine-tuning"; action=:store_true; help="CNN fine tuning")
-        ("--dropouts"; nargs='*'; default=[0.0]; arg_type=Float32,
-         help="dropout rates")
+        ("--finetune"; action=:store_true; help="CNN fine tuning")
+        ("--dropout"; arg_type=Float32; default=Float32(0.0); help="dropout")
+        ("--lastlayer"; default="relu7"; help="last layer for feature extraction")
+        ("--trainloss"; action=:store_true; help="show train set loss")
     end
 
     @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
@@ -43,51 +47,71 @@ function main(args)
     o[:seed] > 0 && srand(o[:seed])
 
     # set dropouts
-    ndrops = length(o[:dropouts])
-    if ndrops == 0
-        dropcnn = droprnn = nothing
-    elseif no[:dropout] == 1
-        dropcnn = droprnn = o[:dropout][1]
-    elseif no[:dropout] == 2
-        dropcnn, droprnn = o[:dropout]
-    else
-        dropcnn, droprnn = o[:dropout][1:end-1], o[:dropout][end]
-    end
+    pdrop = o[:dropout]
 
     # load data
-    data = load(o[:datafile])
-    voc = data["voc"]
-    shuffle!(data["trn"])
+    imgdata = load(o[:images])
+    capdata = load(o[:captions])
+    vocab = capdata["vocab"]
+    extradata = capdata["extradata"]
+
+    if extradata
+        imgdata["train"] = vcat(imgdata["train"], imgdata["restval"])
+        capdata["train"] = vcat(capdata["train"], capdata["restval"])
+    else
+        imgdata["val"] = vcat(imgdata["val"], imgdata["restval"])
+        capdata["val"] = vcat(capdata["val"], capdata["restval"])
+    end
+    delete!(imgdata, "restval")
+    delete!(capdata, "restval")
 
     # generate minibatches
-    trn, t1, m1 = @timed make_batches(data["trn"], voc, o[:batchsize])
-    val, t2, m2 = @timed make_batches(data["val"], voc, o[:batchsize])
+    trn, t1, m1 = @timed make_batches(
+        imgdata["train"], capdata["train"], vocab, o[:batchsize])
+    val, t2, m2 = @timed make_batches(
+        imgdata["val"], capdata["val"], vocab, o[:batchsize])
     @printf("Data loaded. Minibatch operation profiling [%s]\n", now())
     println("trn => time: ", pretty_time(t1), " mem: ", m1, " length: ", length(trn))
     println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
     flush(STDOUT)
 
     atype = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
-    visual = size(trn[1][2], 2);
-    vocabsize = voc.size
+    vocabsize = vocab.size
     
     # initialize state & weights
+    # w1 -> CNN
+    # w2 -> RNN, embeddings
     if o[:loadfile] == nothing
-        w = initweights(atype, o[:hidden], visual, vocabsize, o[:embed], o[:winit])
-        s = initstate(atype, o[:hidden], o[:batchsize])
+        vggmat = matread(o[:cnnfile])
+        w1 = get_vgg_weights(vggmat; last_layer=o[:lastlayer])
+        w2 = initweights(
+            atype, o[:hidden], size(w1[end],1), vocabsize, o[:embed], o[:winit])
     else
-        w = map(i->convert(atype, i), load(o[:loadfile], "weights"));
-        s = initstate(atype, size(w[3], 1), o[:batchsize])
+        w1 = map(i->convert(atype, i), load(o[:loadfile], "w1"))
+        w2 = map(i->convert(atype, i), load(o[:loadfile], "w2"))
     end
+    s = initstate(atype, size(w2[3], 1), o[:batchsize])
 
+    ws, wadd = nothing, nothing
+    if o[:finetune]
+        ws = [w1; w2]
+    else
+        wadd, ws = w1, w2
+    end
+    
     # training
     bestloss = Inf
     @printf("Training has been started. [%s]\n", now()); flush(STDOUT)
 
     for epoch = 1:o[:epochs]
-        _, epochtime = @timed train!(w, s, trn; lr=o[:lr], gclip=o[:gclip])
-        losstrn = test(w, s, trn)
-        lossval = test(w, s, val)
+        _, epochtime = @timed train!(
+            ws, wadd, trn, s; pdrop=pdrop,
+            lr=o[:lr], gclip=o[:gclip])
+        losstrn = o[:trainloss] ? test(ws, wadd, s, trn) : NaN
+        lossval = test(ws, wadd, s, val)
+        if o[:gcheck] > 0
+            gradcheck(loss, ws, wadd, copy(s), trn[1]; gcheck)
+        end
         @printf("epoch:%d softloss:%g/%g (time elapsed: %s) [%s]\n",
                 epoch, losstrn, lossval, pretty_time(epochtime), now())
         flush(STDOUT)
@@ -97,21 +121,30 @@ function main(args)
 
         # save model
         o[:savefile] != nothing && lossval < bestloss || continue
-        bestloss = lossval; save(o[:savefile], "weights", karr2arr(w))
+        bestloss = lossval
+        if o[:finetune]
+            save(o[:savefile],
+                 "w1", karr2arr(ws[1:end-6]),
+                 "w2", karr2arr(ws[end-5:end]))
+        else
+            save(o[:savefile],
+                 "w1", karr2arr(wadd),
+                 "w2", karr2arr(ws))
+        end
     end
 end
 
 # one epoch training
-function train!(w, s, data; lr=1.0, gclip=0.0)
-    for batch in data
-        batch_train!(w, copy(s), batch; lr=lr, gclip=gclip)
+function train!(ws, wadd, batches, s; lr=0.0, gclip=0.0, pdrop=0.0)
+    for batch in batches
+        gloss = lossgradient(ws, wadd, batch, copy(s); pdrop=pdrop)
+        update!(gloss, ws, batch; lr=lr, gclip=gclip)
+        handlestate!(s)
     end
 end
 
-# one minibatch training
-function batch_train!(w, s, batch; lr=1.0, gclip=0.0)
-    _, vis, seq = batch
-    gloss = lossgradient(w, s, vis, seq);
+# update parameters using graddient clipping
+function update!(gloss, w, batch; lr=1.0, gclip=0.0)
     gscale = lr
     if gclip > 0
         gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
@@ -123,18 +156,25 @@ function batch_train!(w, s, batch; lr=1.0, gclip=0.0)
     for k in 1:length(w)
         axpy!(-gscale, gloss[k], w[k])
     end
+end
 
+# handle state matrix (don't have a strong intuition)
+function handlestate!(s)
     isa(s,Vector{Any}) || error("State should not be Boxed.")
     for i = 1:length(s)
         s[i] = AutoGrad.getval(s[i])
     end
 end
 
-# one epoch testing
-test(w, s, data) = mean(map(batch -> batch_test(w, s, batch), data))
+# split testing
+test(loss, ws, s, data) = mean(
+    map(b -> batchtest(loss, ws, s, b), data))
+test(loss, w2, w1, s, data) = mean(
+    map(b -> batchtest(loss, w2, w1, s, b), data))
 
 # one minibatch testing
-batch_test(w, s, batch) = loss(w, s, batch[2], batch[3])
+batchtest(loss, ws, s, batch) = loss(ws, batch, copy(s))
+batchtest(loss, w2, w1, s, batch) = loss(w2, w1, batch, copy(s))
 
 # Knet array to Float32 array conversion
 karr2arr(ws) = map(w -> convert(Array{Float32}, w), ws);

@@ -1,33 +1,48 @@
 # generate minibatches
-function make_batches(data, voc, batchsize)
+function make_batches(images, captions, vocab, batchsize)
+    nimages = length(images)
+    if nimages != length(captions)
+        error("dimensions mismatch (images/captions)")
+    end
+
+    data = []
+    for i = 1:nimages
+        filename1, image = images[i]
+        filename2, raw, tokens = captions[i]
+        filename1 == filename2 || error("filename mismatch")
+        for j = 1:length(tokens)
+            vec = sen2vec(vocab, tokens[j])
+            push!(data, (filename1, image, raw, vec))
+        end
+    end
+
     nsamples = length(data)
     nbatches = div(nsamples, batchsize)
     batches = Any[]
+    shuffle!(data)
 
+    # build batches
     for n = 1:nbatches
         lower = (n-1)*batchsize+1
         upper = min(lower+batchsize-1, nsamples)
         samples = data[lower:upper]
-        longest = mapreduce(s -> length(s[3]), max, samples)
+        vectors = map(s -> sen2vec(vocab, s[4]), samples)
+        longest = mapreduce(length, max, vectors)
 
-        # filenames
-        fs = map(s -> s[1], samples)
+        # batch data
+        bfilenames = map(s -> s[1], samples)
+        bimages = mapreduce(s -> s[2], (x...) -> cat(4, x...), samples)
+        bsentences = map(s -> s[3], samples)
+        bcaptions = map(
+            i -> zeros(Cuchar, upper-lower+1, vocab.size), [1:longest...])
 
-        # visual features concat
-        visual = mapreduce(s -> s[2], hcat, samples)
-
-        # build sentences array
-        sentences = map(i -> spzeros(Float32, voc.size, upper-lower+1), [1:longest...])
-        for i = 1:upper-lower+1 # slice
-            sen = samples[i][3]
-            len = length(sen)
-            for j = 1:longest # sentence
-                j > len && break
-                sentences[j][sen[j], i] = 1.0
-            end
+        # build captions array for neural network
+        for i = 1:upper-lower+1
+            map!(j -> bcaptions[j][i,vectors[i][j]] = 1,
+                 [1:length(vectors[i])...])
         end
 
-        push!(batches, (fs, visual', map(transpose, sentences)))
+        push!(batches, (bfilenames, bimages, bsentences, bcaptions))
     end
 
     return batches

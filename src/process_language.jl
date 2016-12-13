@@ -1,4 +1,4 @@
-using ArgParse, JLD, Images, JSON
+using ArgParse, JLD, JSON
 include("vocab.jl");
 SPLITS = ["train", "restval", "val", "test"]
 
@@ -22,9 +22,13 @@ function main(args)
     file = joinpath(split(splitdir(zip)[2], ".")[1], "dataset.json")
     entries = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
     vocabulary_splits = ["train"]
-    o[:dataset] == "coco" && o[:extradata] && push!(vocabulary_splits, "restval")
-    vocabulary = build_vocabulary(entries, vocabulary_splits)
-
+    extradata = false
+    if o[:dataset] == "coco" && o[:extradata]
+        extradata = true
+        push!(vocabulary_splits, "restval")
+    end
+    vocab = build_vocabulary(entries, vocabulary_splits, o[:minoccur])
+    data = process_language(entries, vocab)
 
     # save process data
     save(o[:savefile],
@@ -32,33 +36,35 @@ function main(args)
          "val", data["val"],
          "restval", data["restval"],
          "test", data["test"],
-         "vocab", vocab)
+         "vocab", vocab,
+         "extradata", extradata)
 end
 
 
-function build_vocabulary(entries, splits)
+function build_vocabulary(entries, splits, minoccur)
     words = []
     for entry in entries
         in(entry["split"], splits) || continue
         entry_words = mapreduce(s -> s["tokens"], vcat, entry["sentences"])
         push!(words, entry_words...)
     end
-    return Vocabulary(words, o[:minoccur])
+    return Vocabulary(words, minoccur)
 end
 
 
 function process_language(entries, vocab)
     data = Dict()
     for splitname in SPLITS
-        entries = filter(e -> e["split"] == splitname, entries)
-        for entry in entries
+        splitdata = []
+        splitentries = filter(e -> e["split"] == splitname, entries)
+        for entry in splitentries
             sentences = map(
                 s -> (s["raw"], sen2vec(vocab, s["tokens"])), entry["sentences"])
             push!(splitdata, (entry["filename"], sentences...))
         end
-
         data[splitname] = splitdata
     end
+    return data
 end
 
 

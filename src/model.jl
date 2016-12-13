@@ -1,3 +1,20 @@
+# dropout layer
+dropout(x,d) = x .* (rand!(similar(AutoGrad.getval(x))) .> d) * (1/(1-d))
+
+# loss function
+function loss(ws, wadd, data, s; pdrop=0.0)
+    images, captions = KnetArray(data[2]), data[4]
+    if wadd == nothing
+        visual = transpose(vgg16(ws[1:end-6], images; pdrop=pdrop))
+    else
+        visual = transpose(vgg16(wadd, images; pdrop=pdrop))
+    end
+    decoder(ws[end-5:end], s, visual, captions; pdrop=pdrop)
+end
+
+# loss gradient
+lossgradient = grad(loss)
+
 # initialize hidden and cell arrays
 function initstate(atype, hidden, batchsize)
     state = Array(Any, 2);
@@ -6,8 +23,7 @@ function initstate(atype, hidden, batchsize)
     return map(s->convert(atype,s), state);
 end
 
-
-# initialize all weights of the whole network
+# initialize all weights of decoder network
 # w[1] & w[2] => weight and bias params for LSTM network
 # w[3] & w[4] => weight and bias params for softmax layer
 # w[5] & w[6] => weights for visual and textual embeddings
@@ -26,7 +42,7 @@ end
 
 
 # LSTM model - input * weight, concatenated weights
-function lstm(weight, bias, hidden, cell, input; encoding=false)
+function lstm(weight, bias, hidden, cell, input)
     gates   = hcat(input,hidden) * weight .+ bias;
     hsize   = size(hidden,2);
     forget  = sigm(gates[:,1:hsize]);
@@ -38,15 +54,14 @@ function lstm(weight, bias, hidden, cell, input; encoding=false)
     return (hidden,cell)
 end
 
-# loss function for whole network
-function loss(w, s, vis, seq)
-    total = 0.0;
-    count = 0;
+
+# loss function for decoder network
+function decoder(w, s, vis, seq; pdrop=0.0)
+    total, count = 0, 0;
     atype = typeof(AutoGrad.getval(w[1]));
 
     # visual features
-    x = convert(atype, vis)
-    x =  x * w[5];
+    x =  vis * w[5];
     (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
 
     # textual features
@@ -54,7 +69,11 @@ function loss(w, s, vis, seq)
     for i = 1:length(seq)-1
         x = x * w[6];
         (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
-        ypred = logp(s[1] * w[3] .+ w[4], 2);
+        probs = s[1] * w[3] .+ w[4]
+        if pdrop > 0.0
+            probs = dropout(probs, pdrop)
+        end
+        ypred = logp(probs, 2);
         ygold = convert(atype, seq[i+1]);
         total += sum(ygold .* ypred);
         count += size(ygold, 1);
@@ -63,5 +82,3 @@ function loss(w, s, vis, seq)
 
     return -total / count;
 end
-
-lossgradient = grad(loss)
