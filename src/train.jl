@@ -31,17 +31,16 @@ function main(args)
         ("--lr"; arg_type=Float32; default=Float32(2.0))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1)
-        ("--gcheck"; action=:store_true; help="gradient checking")
+        ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--batchshuffle"; action=:store_true)
         ("--finetune"; action=:store_true; help="CNN fine tuning")
         ("--dropout"; arg_type=Float32; default=Float32(0.0); help="dropout")
         ("--lastlayer"; default="relu7"; help="last layer for feature extraction")
-        ("--trainloss"; action=:store_true; help="show train set loss")
+        ("--fast"; action=:store_true; help="do not compute train loss")
     end
 
-    @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
-
     # parse args
+    @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
     o[:seed] > 0 && srand(o[:seed])
@@ -79,8 +78,7 @@ function main(args)
     vocabsize = vocab.size
     
     # initialize state & weights
-    # w1 -> CNN
-    # w2 -> RNN, embeddings
+    # w1 -> CNN | w2 -> RNN, embeddings
     if o[:loadfile] == nothing
         vggmat = matread(o[:cnnfile])
         w1 = get_vgg_weights(vggmat; last_layer=o[:lastlayer])
@@ -105,12 +103,11 @@ function main(args)
 
     for epoch = 1:o[:epochs]
         _, epochtime = @timed train!(
-            ws, wadd, trn, s; pdrop=pdrop,
-            lr=o[:lr], gclip=o[:gclip])
-        losstrn = o[:trainloss] ? test(ws, wadd, s, trn) : NaN
+            ws, wadd, s, trn; pdrop=pdrop, lr=o[:lr], gclip=o[:gclip])
+        losstrn = o[:fast] ? NaN : test(ws, wadd, s, trn)
         lossval = test(ws, wadd, s, val)
         if o[:gcheck] > 0
-            gradcheck(loss, ws, wadd, copy(s), trn[1]; gcheck)
+            gradcheck(loss, ws, wadd, s, trn[1][2:end]...; gcheck=o[:gcheck])
         end
         @printf("epoch:%d softloss:%g/%g (time elapsed: %s) [%s]\n",
                 epoch, losstrn, lossval, pretty_time(epochtime), now())
@@ -135,16 +132,17 @@ function main(args)
 end
 
 # one epoch training
-function train!(ws, wadd, batches, s; lr=0.0, gclip=0.0, pdrop=0.0)
+function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, pdrop=0.0)
     for batch in batches
-        gloss = lossgradient(ws, wadd, batch, copy(s); pdrop=pdrop)
-        update!(gloss, ws, batch; lr=lr, gclip=gclip)
+        _, img, cap = batch
+        gloss = lossgradient(ws, wadd, copy(s), img, cap; pdrop=pdrop)
+        update!(gloss, ws; lr=lr, gclip=gclip)
         handlestate!(s)
     end
 end
 
-# update parameters using graddient clipping
-function update!(gloss, w, batch; lr=1.0, gclip=0.0)
+# update parameters using gradient clipping
+function update!(gloss, w; lr=1.0, gclip=0.0)
     gscale = lr
     if gclip > 0
         gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
@@ -167,14 +165,10 @@ function handlestate!(s)
 end
 
 # split testing
-test(loss, ws, s, data) = mean(
-    map(b -> batchtest(loss, ws, s, b), data))
-test(loss, w2, w1, s, data) = mean(
-    map(b -> batchtest(loss, w2, w1, s, b), data))
+test(ws, wadd, s, data) = mean(map(b -> batchtest(ws, wadd, s, b), data))
 
 # one minibatch testing
-batchtest(loss, ws, s, batch) = loss(ws, batch, copy(s))
-batchtest(loss, w2, w1, s, batch) = loss(w2, w1, batch, copy(s))
+batchtest(ws, wadd, s, b) = loss(ws, wadd, copy(s), b[2], b[3])
 
 # Knet array to Float32 array conversion
 karr2arr(ws) = map(w -> convert(Array{Float32}, w), ws);

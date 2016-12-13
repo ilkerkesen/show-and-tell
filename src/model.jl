@@ -2,8 +2,8 @@
 dropout(x,d) = x .* (rand!(similar(AutoGrad.getval(x))) .> d) * (1/(1-d))
 
 # loss function
-function loss(ws, wadd, data, s; pdrop=0.0)
-    images, captions = KnetArray(data[2]), data[4]
+function loss(ws, wadd, s, images, captions; pdrop=0.0)
+    images = KnetArray(images)
     if wadd == nothing
         visual = transpose(vgg16(ws[1:end-6], images; pdrop=pdrop))
     else

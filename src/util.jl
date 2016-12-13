@@ -1,3 +1,13 @@
+function extract_file_from_tar(tar, tmp, from, to)
+    sc = count(x->x=='/', from[1:end-1])
+    run(`tar -xf $tar --strip-components=$sc -C $tmp --directory $from $to`)
+end
+
+function extract_file_from_zip(zip, tmp, from, to)
+    filecontent = readstring(`unzip -p $zip $from`)
+    write(to, filecontent)
+end
+
 # FIXME: pretty elapsed time conversion
 function pretty_time(t)
     t = round(t)

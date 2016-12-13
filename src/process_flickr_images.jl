@@ -1,7 +1,7 @@
 using ArgParse, JLD, Images, JSON
-
 SPLITS = ["train", "restval", "val", "test"]
-
+include("imgproc.jl")
+include("util.jl")
 
 function main(args)
     s = ArgParseSettings()
@@ -12,6 +12,8 @@ function main(args)
         ("--captions"; required=true;
          help="captions archive file path (karpathy)")
         ("--savefile"; required=true; help="output file in JLD format")
+        ("--dataset"; default="flickr8k";
+         help="dataset name (flickr8k|flickr30k)")
         ("--tmpdir"; default=joinpath(homedir(), "tmp");
          help="tmpdir for processing")
         ("--imsize"; arg_type=Int; nargs=2; default=[224,224];
@@ -39,7 +41,7 @@ function main(args)
         filenames = get_filenames(capfile, splitname)
         splitdata = []
         for f in filenames
-            img = read_image(f, imgfile, tmpdir)
+            img = read_image(f, imgfile, tmpdir, o[:dataset])
             img = process_image(img, newsize, rgbmean)
             push!(splitdata, (f, img))
         end
@@ -54,34 +56,23 @@ function main(args)
          "test", data["test"])
 end
 
+function read_image(file, zip, tmp, dataset)
+    prefix = "Flicker8k_Dataset"
+    if dataset == "flickr30k"
+        prefix = "flickr30k-images"
+    end
 
-function get_filenames(zip, split)
-    zip = abspath(zip)
-    file = joinpath(splitext(splitdir(abspath(zip))[2])[1], "dataset.json")
-    images = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
-    return map(j -> j["filename"], filter(i -> i["split"] == split, images))
-end
-
-
-function read_image(file, zip, tmp)
-    source = joinpath("Flicker8k_Dataset", file)
+    source = joinpath(prefix, file)
     target = joinpath(tmp, file)
-    img = readstring(`unzip -p $zip Flicker8k_Dataset/$file`)
-    write(target, img)
+    if dataset == "flickr30k"
+        extract_file_from_tar(zip, tmp, source, target)
+    else
+        extract_file_from_zip(zip, tmp, source, target)
+    end
+
     img = load(target)
     rm(target)
     return img
 end
-
-
-function process_image(img, newsize, rgbmean)
-    a1 = Images.imresize(img, newsize) # resize image
-    b1 = separate(a1) # separate image channels, build a tensor
-    c1 = convert(Array{Float32}, b1) # type conversion
-    d1 = reshape(c1[:,:,1:3], (newsize[1],newsize[2],3,1)) # reshape
-    e1 = (255 * d1 .- rgbmean) # 8bit image representation
-    return permutedims(e1, [2,1,3,4]) # transpose
-end
-
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

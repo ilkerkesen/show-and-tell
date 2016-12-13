@@ -32,7 +32,7 @@ function make_batches(images, captions, vocab, batchsize)
         # batch data
         bfilenames = map(s -> s[1], samples)
         bimages = mapreduce(s -> s[2], (x...) -> cat(4, x...), samples)
-        bsentences = map(s -> s[3], samples)
+        # bsentences = map(s -> s[3], samples)
         bcaptions = map(
             i -> zeros(Cuchar, upper-lower+1, vocab.size), [1:longest...])
 
@@ -42,7 +42,7 @@ function make_batches(images, captions, vocab, batchsize)
                  [1:length(vectors[i])...])
         end
 
-        push!(batches, (bfilenames, bimages, bsentences, bcaptions))
+        push!(batches, (bfilenames, bimages, bcaptions))
     end
 
     return batches
