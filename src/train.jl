@@ -84,9 +84,14 @@ function main(args)
         w1 = get_vgg_weights(vggmat; last_layer=o[:lastlayer])
         w2 = initweights(
             atype, o[:hidden], size(w1[end],1), vocabsize, o[:embed], o[:winit])
+        bestloss = Inf
     else
-        w1 = map(i->convert(atype, i), load(o[:loadfile], "w1"))
-        w2 = map(i->convert(atype, i), load(o[:loadfile], "w2"))
+        w1 = load(o[:loadfile], "w1")
+        w2 = load(o[:loadfile], "w2")
+        bestloss = load(o[:loadfile], "lossval")
+        save(o[:savefile], "w1", w1, "w2", w2, "lossval", bestloss)
+        w1 = map(i->convert(atype, i), w1)
+        w2 = map(i->convert(atype, i), w2)
     end
     s = initstate(atype, size(w2[3], 1), o[:batchsize])
 
@@ -98,7 +103,6 @@ function main(args)
     end
     
     # training
-    bestloss = Inf
     @printf("Training has been started. [%s]\n", now()); flush(STDOUT)
 
     for epoch = 1:o[:epochs]
@@ -117,17 +121,20 @@ function main(args)
         o[:batchshuffle] && shuffle!(trn)
 
         # save model
-        o[:savefile] != nothing && lossval < bestloss || continue
+        (o[:savefile] != nothing && lossval < bestloss) || continue
         bestloss = lossval
         if o[:finetune]
             save(o[:savefile],
                  "w1", karr2arr(ws[1:end-6]),
-                 "w2", karr2arr(ws[end-5:end]))
+                 "w2", karr2arr(ws[end-5:end]),
+                 "lossval", bestloss)
         else
             save(o[:savefile],
                  "w1", karr2arr(wadd),
-                 "w2", karr2arr(ws))
+                 "w2", karr2arr(ws),
+                 "lossval", bestloss)
         end
+        @printf("Model saved.\n"); flush(STDOUT)
     end
 end
 
