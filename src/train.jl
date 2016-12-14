@@ -79,12 +79,12 @@ function main(args)
     
     # initialize state & weights
     # w1 -> CNN | w2 -> RNN, embeddings
+    bestloss = Inf
     if o[:loadfile] == nothing
         vggmat = matread(o[:cnnfile])
         w1 = get_vgg_weights(vggmat; last_layer=o[:lastlayer])
         w2 = initweights(
             atype, o[:hidden], size(w1[end],1), vocabsize, o[:embed], o[:winit])
-        bestloss = Inf
     else
         w1 = load(o[:loadfile], "w1")
         w2 = load(o[:loadfile], "w2")
@@ -103,8 +103,8 @@ function main(args)
     end
     
     # training
-    @printf("Training has been started. [%s]\n", now()); flush(STDOUT)
-
+    @printf("Training has been started (lossval=%g). [%s]\n", bestloss, now())
+    flush(STDOUT)
     for epoch = 1:o[:epochs]
         _, epochtime = @timed train!(
             ws, wadd, s, trn; pdrop=pdrop, lr=o[:lr], gclip=o[:gclip])
