@@ -1,49 +1,49 @@
 using ArgParse, JLD, Images, JSON
 SPLITS = ["train", "restval", "val", "test"]
-include("imgproc.jl")
-include("util.jl")
 
 function main(args)
     s = ArgParseSettings()
     s.description = "Convert common image captioning datasets to JLD format."
 
     @add_arg_table s begin
-        ("--images"; required=true; help="images archive file path")
+        ("--images"; required=true; help="images dir")
         ("--captions"; required=true;
          help="captions archive file path (karpathy)")
         ("--savefile"; required=true; help="output file in JLD format")
-        ("--dataset"; default="flickr8k";
-         help="dataset name (flickr8k|flickr30k)")
-        ("--tmpdir"; default=joinpath(homedir(), "tmp");
-         help="tmpdir for processing")
         ("--imsize"; arg_type=Int; nargs=2; default=[224,224];
          help="new image sizes")
         ("--rgbmean"; arg_type=Float32; nargs=3;
          default=map(Float32, [123.68, 116.779, 103.939]))
+        ("--feedback"; arg_type=Int; default=0;
+         help="period of displaying number of images processed")
     end
 
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
-    imgfile = abspath(o[:images])
+    imgpath = abspath(o[:images])
     capfile = abspath(o[:captions])
-    tmpdir = abspath(o[:tmpdir])
     newsize = tuple(o[:imsize]...)
     rgbmean = reshape(o[:rgbmean], (1,1,3))
-
-    # prepare tmpdir 
-    !isdir(tmpdir) && mkpath(tmpdir)
 
     # process images
     data = Dict()
     for splitname in SPLITS
-        @printf("Processing %s split...\n", splitname)
+        @printf("Processing %s split... [%s]\n", splitname, now()); flush(STDOUT)
         filenames = get_filenames(capfile, splitname)
         splitdata = []
+        counter = 0
         for f in filenames
-            img = read_image(f, imgfile, tmpdir, o[:dataset])
+            img = read_image(f, imgpath)
             img = process_image(img, newsize, rgbmean)
             push!(splitdata, (f, img))
+
+            # debug
+            counter += 1
+            if o[:feedback] > 0 && counter % o[:feedback] == 0
+                @printf("Processed %d images by so far...\n", counter)
+                flush(STDOUT)
+            end
         end
         data[splitname] = splitdata
     end
@@ -54,25 +54,29 @@ function main(args)
          "restval", data["restval"],
          "val", data["val"],
          "test", data["test"])
+    @printf("Processed images saved to %s. [%s]\n", o[:savefile], now())
 end
 
-function read_image(file, zip, tmp, dataset)
-    prefix = "Flicker8k_Dataset"
-    if dataset == "flickr30k"
-        prefix = "flickr30k-images"
-    end
-
-    source = joinpath(prefix, file)
-    target = joinpath(tmp, file)
-    if dataset == "flickr30k"
-        extract_file_from_tar(zip, source, tmp)
-    else
-        extract_file_from_zip(zip, source, target)
-    end
-
+function read_image(file, imgpath)
+    target = joinpath(imgpath, file)
     img = load(target)
-    rm(target)
     return img
+end
+
+function get_filenames(zip, split)
+    zip = abspath(zip)
+    file = joinpath(splitext(splitdir(abspath(zip))[2])[1], "dataset.json")
+    images = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
+    return map(j -> j["filename"], filter(i -> i["split"] == split, images))
+end
+
+function process_image(img, newsize, rgbmean)
+    a1 = Images.imresize(img, newsize) # resize image
+    b1 = separate(a1) # separate image channels, build a tensor
+    c1 = convert(Array{Float32}, b1) # type conversion
+    d1 = reshape(c1[:,:,1:3], (newsize[1],newsize[2],3,1)) # reshape
+    e1 = (255 * d1 .- rgbmean) # 8bit image representation
+    return permutedims(e1, [2,1,3,4]) # transpose
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)
