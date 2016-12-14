@@ -55,6 +55,7 @@ end
 function process_language(entries, vocab)
     data = Dict()
     for splitname in SPLITS
+        @printf("Processing %s split [%s]\n", splitname, now()); flush(STDOUT)
         splitdata = []
         splitentries = filter(e -> e["split"] == splitname, entries)
         for entry in splitentries
