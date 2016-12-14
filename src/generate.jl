@@ -10,46 +10,70 @@ function main(args)
     s.description = "Caption generation script for the model."
 
     @add_arg_table s begin
-        ("--datafile"; help="data file contains vocabulary")
+        ("--images"; help="data file contains vocabulary")
+        ("--captions"; help="data file contains vocabulary")
         ("--modelfile"; help="trained model file")
         ("--savedir"; help="save generations and references")
-        ("--datasplit"; default="tst"; help="data split is going to be used")
+        ("--datasplit"; default="test"; help="data split is going to be used")
         ("--maxlen"; arg_type=Int; default=20; help="max sentence length")
         ("--nogpu"; action=:store_true)
         ("--testing"; action=:store_true)
         ("--shuffle"; action=:store_true)
         ("--debug"; action=:store_true)
-        ("--amount"; arg_type=Int; default=20; help="generation amount in case of testing")
+        ("--amount"; arg_type=Int; default=20;
+         help="generation amount in case of testing")
     end
 
-    println("Datetime: ", now()); flush(STDOUT)
-
     # parse args
+    println("Datetime: ", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
     # checkdir
-    !isdir(o[:savedir]) && (println("savedir does not exist."); flush(STDOUT); quit())
+    if !isdir(o[:savedir])
+        println("savedir does not exist.")
+        flush(STDOUT)
+        quit()
+    end
 
     # load data
-    tst = load(o[:datafile], o[:datasplit])
-    voc = load(o[:datafile], "voc")
+    images = load(o[:images], o[:datasplit])
+    captions = load(o[:captions], o[:datasplit])
+    vocab = load(o[:captions], "vocab")
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
 
+    # testing, I usually use this for train split
     o[:testing] && o[:shuffle] && shuffle!(tst)
 
-    refs, gens = Dict(), Dict()
-    counter, ti = 0, now()
+    # load weights
     atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
+    w1 = load(o[:modelfile], "w1")
+    w2 = load(o[:modelfile], "w2")
+    lossval = load(o[:modelfile], "lossval")
+    w1 = map(i->convert(atype, i), w1)
+    w2 = map(i->convert(atype, i), w2)
+    
     w = map(i->convert(atype, i), load(o[:modelfile], "weights"));
     s = initstate(atype, size(w[3], 1), 1)
 
     # generate captions
-    for i = 1:length(tst)
+    counter, ti = 0, now()
+    refs, gens = Dict(), Dict()
+    @printf("Generation started (loss=%g,date=%s)\n", lossval, now())
+    flush(STDOUT)
+    for i = 1:length(images)
         o[:testing] && counter >= o[:amount] && break
-        gen = generate(atype, w, copy(s), tst[i][2], voc, o[:maxlen])
+
+        # check filenames
+        f1, f2 = images[i][1], captions[i][1]
+        f1 == f2 || error("filename mismatch")
+
+        image = images[i][2]
+        raw = captions[i][2]
+        token = 
+        gen = generate(atype, w, copy(s), tst[i][2], vocab, o[:maxlen])
         fn = tst[i][1]
-        orig = vec2sen(voc, tst[i][3])
+        orig = vec2sen(vocab, tst[i][3])
 
         !haskey(gens, fn) && (gens[fn] = gen; refs[fn] = Any[])
         push!(refs[fn], orig)
@@ -98,38 +122,5 @@ function main(args)
     tf = now()
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)
 end
-
-
-function generate(atype, w, s, vis, voc, maxlen)
-    # feed visual features
-    x = reshape(vis, 1, length(vis))
-    x = convert(atype, x)
-    x = x * w[5]
-    (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x)
-
-    # language generation
-    word = SOS
-    sentence = Any[word]
-    len = 1
-
-    while word != EOS && len < maxlen
-        x = reshape(word2onehot(voc, word), 1, voc.size)
-        x = convert(atype, x) * w[6]
-        (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
-        ypred = logp(s[1] * w[3] .+ w[4], 2)
-        ypred = convert(Array{Float32}, ypred)
-        word = index2word(voc, indmax(ypred))
-        push!(sentence, word)
-        len += 1
-    end
-
-    if word == EOS
-        pop!(sentence)
-    end
-
-    return join(sentence[2:end], " ")
-end
-
-vec2sen(voc::Vocabulary, vec) = join(map(i -> index2word(voc,i), vec[2:end-1]), " ")
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

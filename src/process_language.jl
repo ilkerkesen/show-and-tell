@@ -61,7 +61,7 @@ function process_language(entries, vocab)
         for entry in splitentries
             sentences = map(
                 s -> (s["raw"], sen2vec(vocab, s["tokens"])), entry["sentences"])
-            push!(splitdata, (entry["filename"], sentences...))
+            push!(splitdata, (entry["filename"], sentences))
         end
         data[splitname] = splitdata
     end

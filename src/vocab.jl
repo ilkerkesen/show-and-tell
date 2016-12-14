@@ -57,3 +57,4 @@ word2svec(voc::Vocabulary, w) = (v = map(atype,spzeros(voc.size,1)); v[word2inde
 sen2smat(voc::Vocabulary, s) = mapreduce(w -> word2svec(voc, w), hcat, [SOS;s;EOS])
 pad2index(voc::Vocabulary) = word2index(voc, PAD)
 pad2oneheot(voc::Vocabulary) = word2onehot(voc, PAD) 
+vec2sen(voc::Vocabulary, vec) = join(map(i -> index2word(voc,i), vec[2:end-1]), " ")

@@ -16,6 +16,7 @@ function main(args)
          default=map(Float32, [123.68, 116.779, 103.939]))
         ("--feedback"; arg_type=Int; default=0;
          help="period of displaying number of images processed")
+        ("--debug"; action=:store_true)
     end
 
     isa(args, AbstractString) && (args=split(args))
@@ -34,11 +35,17 @@ function main(args)
         splitdata = []
         counter = 0
         for f in filenames
+            # debug
+            if o[:debug]
+                @printf("Image: %s\n", f); flush(STDOUT)
+            end
+
+            # processing
             img = read_image(f, imgpath)
             img = process_image(img, newsize, rgbmean)
             push!(splitdata, (f, img))
 
-            # debug
+            # feedback
             counter += 1
             if o[:feedback] > 0 && counter % o[:feedback] == 0
                 @printf("Processed %d images by so far...\n", counter)
@@ -73,7 +80,14 @@ end
 function process_image(img, newsize, rgbmean)
     a1 = Images.imresize(img, newsize) # resize image
     b1 = separate(a1) # separate image channels, build a tensor
-    c1 = convert(Array{Float32}, b1) # type conversion
+    colordim = b1.properties["colordim"]
+    colorspace = b1.properties["colorspace"]
+    if colordim != 3 || colorspace == "Gray"
+        c1 = convert(Array{Float32}, b1.data)
+        c1 = cat(3, cat(3, c1, c1), c1)
+    else
+        c1 = convert(Array{Float32}, b1) # type conversion
+    end
     d1 = reshape(c1[:,:,1:3], (newsize[1],newsize[2],3,1)) # reshape
     e1 = (255 * d1 .- rgbmean) # 8bit image representation
     return permutedims(e1, [2,1,3,4]) # transpose

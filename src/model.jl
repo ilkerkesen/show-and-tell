@@ -82,3 +82,34 @@ function decoder(w, s, vis, seq; pdrop=0.0)
 
     return -total / count;
 end
+
+# generate
+function generate(w1, w2, image, caption, vocab, maxlen)
+    atype = typeof(AutoGrad.getval(w2[1]))
+    images = convert(atype, images)
+    vis = transpose(vgg16(w1, images))
+    x = vis * w2[5]
+    (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x)
+
+    # language generation
+    word = SOS
+    sentence = Any[word]
+    len = 1
+
+    while word != EOS && len < maxlen
+        x = reshape(word2onehot(voc, word), 1, voc.size)
+        x = convert(atype, x) * w2[6]
+        (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x);
+        ypred = logp(s[1] * w2[3] .+ w2[4], 2)
+        ypred = convert(Array{Float32}, ypred)
+        word = index2word(voc, indmax(ypred))
+        push!(sentence, word)
+        len += 1
+    end
+
+    if word == EOS
+        pop!(sentence)
+    end
+
+    return join(sentence[2:end], " ")
+end
