@@ -1,9 +1,9 @@
-function extract_file_from_tar(tar, tmp, from, to)
+function extract_file_from_tar(tar, from, to)
     sc = count(x->x=='/', from[1:end-1])
-    run(`tar -xf $tar --strip-components=$sc -C $tmp --directory $from $to`)
+    run(`tar -xf $tar --strip-components=$sc -C $to --directory $from`)
 end
 
-function extract_file_from_zip(zip, tmp, from, to)
+function extract_file_from_zip(zip, from, to)
     filecontent = readstring(`unzip -p $zip $from`)
     write(to, filecontent)
 end

@@ -65,9 +65,9 @@ function read_image(file, zip, tmp, dataset)
     source = joinpath(prefix, file)
     target = joinpath(tmp, file)
     if dataset == "flickr30k"
-        extract_file_from_tar(zip, tmp, source, target)
+        extract_file_from_tar(zip, source, tmp)
     else
-        extract_file_from_zip(zip, tmp, source, target)
+        extract_file_from_zip(zip, source, target)
     end
 
     img = load(target)
