@@ -3,6 +3,7 @@ using ArgParse
 using JLD
 
 include("vocab.jl")
+include("convnet.jl")
 include("model.jl")
 
 function main(args)
@@ -22,6 +23,8 @@ function main(args)
         ("--debug"; action=:store_true)
         ("--amount"; arg_type=Int; default=20;
          help="generation amount in case of testing")
+        ("--noreferences"; action=:store_true;
+         help="this is for non-dataset images")
     end
 
     # parse args
@@ -35,6 +38,7 @@ function main(args)
         flush(STDOUT)
         quit()
     end
+    savedir = abspath(o[:savedir])
 
     # load data
     images = load(o[:images], o[:datasplit])
@@ -52,75 +56,65 @@ function main(args)
     lossval = load(o[:modelfile], "lossval")
     w1 = map(i->convert(atype, i), w1)
     w2 = map(i->convert(atype, i), w2)
-    
-    w = map(i->convert(atype, i), load(o[:modelfile], "weights"));
-    s = initstate(atype, size(w[3], 1), 1)
+    s = initstate(atype, size(w2[3], 1), 1)
 
     # generate captions
     counter, ti = 0, now()
-    refs, gens = Dict(), Dict()
+    filenames, references, generations = [], [], []
     @printf("Generation started (loss=%g,date=%s)\n", lossval, now())
     flush(STDOUT)
     for i = 1:length(images)
         o[:testing] && counter >= o[:amount] && break
-
-        # check filenames
-        f1, f2 = images[i][1], captions[i][1]
-        f1 == f2 || error("filename mismatch")
-
+        filename1, filename2 = images[i][1], captions[i][1]
+        filename1 == filename2 || error("filename mismatch")
         image = images[i][2]
-        raw = captions[i][2]
-        token = 
-        gen = generate(atype, w, copy(s), tst[i][2], vocab, o[:maxlen])
-        fn = tst[i][1]
-        orig = vec2sen(vocab, tst[i][3])
-
-        !haskey(gens, fn) && (gens[fn] = gen; refs[fn] = Any[])
-        push!(refs[fn], orig)
-
-        if o[:debug]
-            @printf("filename: %s\noriginal: %s\ngenerated: %s [%s]\n\n",
-                    fn, orig, gen, now()); flush(STDOUT)
-        end
+        sentences = map(s -> s[1], captions[i][2])
+        generated = generate(w1, w2, copy(s), image, vocab, o[:maxlen])
+        o[:debug] && report_generation(filename1, generated, sentences)
+        push!(filenames, filename1)
+        push!(references, sentences)
+        push!(generations, generated)
         counter += 1
     end
 
-    o[:testing] && return
-    
-    # some validation
-    ks = sort(collect(keys(refs)))
-    sz = length(refs[ks[1]])
-    for i = 2:length(ks)
-        length(refs[ks[i]]) == sz || (println("Validation error! ", ks[i], " ", sz); quit())
+    if !o[:testing]
+        write_generations(savedir, filenames, generations, references)
     end
-
-    # open file streams
-    files = Any[]
-    for i = 1:sz
-        f = open(abspath(joinpath(o[:savedir], "refs$(i).txt")), "w")
-        println("file: ", f); flush(STDOUT)
-        push!(files, f)
-    end
-    resfile = open(abspath(joinpath(o[:savedir], "results.txt")), "w")
-    namefile = open(abspath(joinpath(o[:savedir], "filenames.txt")), "w")
-
-    for i = 1:length(ks)
-        write(resfile, string(gens[ks[i]], "\n"))
-        write(namefile, string(ks[i], "\n"))
-        for j = 1:sz
-            write(files[j], string(refs[ks[i]][j], "\n"))
-        end
-    end
-
-    # close file streams
-    for i = 1:sz
-        close(files[i])
-    end
-    close(resfile)
-    close(namefile)
 
     tf = now()
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)
+end
+
+function report_generation(filename, generated, references)
+    @printf("\nFilename: %s\n", filename)
+    @printf("Generated: %s\n", generated)
+    for i = 1:length(references)
+        @printf("Reference #%d: %s\n", i, references[i])
+    end
+    flush(STDOUT)
+end
+
+function write_generations(savedir, filenames, generations, references)
+    numrefs = length(references[1])
+    files = []
+    for i = 1:numrefs
+        file = open(joinpath(savedir, "references$(i).txt"), "w")
+        push!(files, file)
+    end
+    filenamesfile = open(joinpath(savedir, "filenames.txt"), "w")
+    generationsfile = open(joinpath(savedir, "generations.txt"), "w")
+    for i = 1:length(filenames)
+        write(filenamesfile, string(filenames[i], "\n"))
+        write(generationsfile, string(generations[i], "\n"))
+        for j = 1:numrefs
+            write(files[j], string(references[i][j], "\n"))
+        end
+    end
+    for i = 1:numrefs
+        close(files[i])
+    end
+    close(filenamesfile)
+    close(generationsfile)
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

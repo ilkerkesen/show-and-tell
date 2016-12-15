@@ -70,8 +70,10 @@ function main(args)
     val, t2, m2 = @timed make_batches(
         imgdata["val"], capdata["val"], vocab, o[:batchsize])
     @printf("Data loaded. Minibatch operation profiling [%s]\n", now())
-    println("trn => time: ", pretty_time(t1), " mem: ", m1, " length: ", length(trn))
-    println("val => time: ", pretty_time(t2), " mem: ", m2, " length: ", length(val))
+    println("trn => time: ", pretty_time(t1), " mem: ", m1,
+            " length: ", length(trn))
+    println("val => time: ", pretty_time(t2), " mem: ", m2,
+            " length: ", length(val))
     flush(STDOUT)
 
     atype = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}

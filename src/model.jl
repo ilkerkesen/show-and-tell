@@ -84,10 +84,10 @@ function decoder(w, s, vis, seq; pdrop=0.0)
 end
 
 # generate
-function generate(w1, w2, image, caption, vocab, maxlen)
+function generate(w1, w2, s, image, vocab, maxlen)
     atype = typeof(AutoGrad.getval(w2[1]))
-    images = convert(atype, images)
-    vis = transpose(vgg16(w1, images))
+    image = KnetArray(image)
+    vis = transpose(vgg16(w1, image))
     x = vis * w2[5]
     (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x)
 
@@ -97,12 +97,12 @@ function generate(w1, w2, image, caption, vocab, maxlen)
     len = 1
 
     while word != EOS && len < maxlen
-        x = reshape(word2onehot(voc, word), 1, voc.size)
+        x = reshape(word2onehot(vocab, word), 1, vocab.size)
         x = convert(atype, x) * w2[6]
         (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x);
         ypred = logp(s[1] * w2[3] .+ w2[4], 2)
         ypred = convert(Array{Float32}, ypred)
-        word = index2word(voc, indmax(ypred))
+        word = index2word(vocab, indmax(ypred))
         push!(sentence, word)
         len += 1
     end
