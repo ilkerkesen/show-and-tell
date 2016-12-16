@@ -18,7 +18,7 @@ function make_batches(images, captions, vocab, batchsize)
     nsamples = length(data)
     nbatches = div(nsamples, batchsize)
     batches = Any[]
-    # shuffle!(data)
+    shuffle!(data)
 
     # build batches
     for n = 1:nbatches

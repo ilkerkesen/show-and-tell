@@ -1,5 +1,5 @@
-# VGG16 model for convolutional feature etraction
-function vgg16(w, x; pdrop=0.0, mode=0, featuremaps=false)
+# VGG16 model for convolutional feature extraction
+function vgg16(w, x; pdrop=0.0, mode=1, featuremaps=false)
     conv1_1 = conv4(w[1], x; padding=1, mode=mode) .+ w[2]
     conv1_1 = relu(conv1_1)
     conv1_2 = conv4(w[3], conv1_1; padding=1, mode=mode) .+ w[4]
@@ -11,7 +11,7 @@ function vgg16(w, x; pdrop=0.0, mode=0, featuremaps=false)
     conv2_2 = conv4(w[7], conv2_1; padding=1, mode=mode) .+ w[8]
     conv2_2 = relu(conv2_2)
     pool2   = pool(conv2_2)
-    
+
     conv3_1 = conv4(w[9], pool2; padding=1, mode=mode) .+ w[10]
     conv3_1 = relu(conv3_1)
     conv3_2 = conv4(w[11], conv3_1; padding=1, mode=mode) .+ w[12]
@@ -55,7 +55,6 @@ function vgg16(w, x; pdrop=0.0, mode=0, featuremaps=false)
     end
 end
 
-
 function get_vgg_weights(vggmat; last_layer=nothing)
     ws = []
     for l in vggmat["layers"]
@@ -64,7 +63,7 @@ function get_vgg_weights(vggmat; last_layer=nothing)
             if startswith(l["name"], "conv")
                 w[2] = reshape(w[2], (1,1,length(w[2]),1))
             elseif startswith(l["name"], "fc")
-                w[1] = transpose(mat(w[1]))
+                w[1] = mat(w[1])'
             end
             push!(ws, w...)
         end
