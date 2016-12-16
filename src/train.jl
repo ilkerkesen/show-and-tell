@@ -37,6 +37,7 @@ function main(args)
         ("--dropout"; arg_type=Float32; default=Float32(0.0); help="dropout")
         ("--lastlayer"; default="relu7"; help="last layer for feature extraction")
         ("--fast"; action=:store_true; help="do not compute train loss")
+        ("--test"; action=:store_true; help="testing with a small set")
     end
 
     # parse args
@@ -75,10 +76,14 @@ function main(args)
     println("val => time: ", pretty_time(t2), " mem: ", m2,
             " length: ", length(val))
     flush(STDOUT)
+    if o[:test]
+        trn = trn[1:20]
+        val = val[1:10]
+    end
 
     atype = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     vocabsize = vocab.size
-    
+
     # initialize state & weights
     # w1 -> CNN | w2 -> RNN, embeddings
     bestloss = Inf
@@ -103,7 +108,7 @@ function main(args)
     else
         wadd, ws = w1, w2
     end
-    
+
     # training
     @printf("Training has been started (lossval=%g). [%s]\n", bestloss, now())
     flush(STDOUT)
@@ -145,31 +150,22 @@ function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, pdrop=0.0)
     for batch in batches
         _, img, cap = batch
         gloss = lossgradient(ws, wadd, copy(s), img, cap; pdrop=pdrop)
-        update!(gloss, ws; lr=lr, gclip=gclip)
-        handlestate!(s)
-    end
-end
-
-# update parameters using gradient clipping
-function update!(gloss, w; lr=1.0, gclip=0.0)
-    gscale = lr
-    if gclip > 0
-        gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
-        if gnorm > gclip
-            gscale *= gclip / gnorm
+        gscale = lr
+        if gclip > 0
+            gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
+            if gnorm > gclip
+                gscale *= gclip / gnorm
+            end
         end
-    end
 
-    for k in 1:length(w)
-        axpy!(-gscale, gloss[k], w[k])
-    end
-end
+        for k in 1:length(ws)
+            axpy!(-gscale, gloss[k], ws[k])
+        end
 
-# handle state matrix (don't have a strong intuition)
-function handlestate!(s)
-    isa(s,Vector{Any}) || error("State should not be Boxed.")
-    for i = 1:length(s)
-        s[i] = AutoGrad.getval(s[i])
+        isa(s,Vector{Any}) || error("State should not be Boxed.")
+        for i = 1:length(s)
+            s[i] = AutoGrad.getval(s[i])
+        end
     end
 end
 

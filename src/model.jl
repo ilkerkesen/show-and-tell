@@ -68,12 +68,12 @@ function decoder(w, s, vis, seq; pdrop=0.0)
     x = convert(atype, seq[1]);
     for i = 1:length(seq)-1
         x = x * w[6];
-        (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
-        probs = s[1] * w[3] .+ w[4]
+        (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x)
+        ht = s[1]
         if pdrop > 0.0
-            probs = dropout(probs, pdrop)
+            ht = dropout(ht, pdrop)
         end
-        ypred = logp(probs, 2);
+        ypred = logp(ht * w[3] .+ w[4], 2);
         ygold = convert(atype, seq[i+1]);
         total += sum(ygold .* ypred);
         count += size(ygold, 1);
@@ -87,8 +87,8 @@ end
 function generate(w1, w2, s, image, vocab, maxlen)
     atype = typeof(AutoGrad.getval(w2[1]))
     image = KnetArray(image)
-    vis = transpose(vgg16(w1, image))
-    x = vis * w2[5]
+    vis = vgg16(w1, image)
+    x = transpose(vis) * w2[5]
     (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x)
 
     # language generation
@@ -100,7 +100,7 @@ function generate(w1, w2, s, image, vocab, maxlen)
         x = reshape(word2onehot(vocab, word), 1, vocab.size)
         x = convert(atype, x) * w2[6]
         (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x);
-        ypred = logp(s[1] * w2[3] .+ w2[4], 2)
+        ypred = s[1] * w2[3] .+ w2[4]
         ypred = convert(Array{Float32}, ypred)
         word = index2word(vocab, indmax(ypred))
         push!(sentence, word)
