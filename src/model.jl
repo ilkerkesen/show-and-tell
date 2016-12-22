@@ -9,7 +9,7 @@ function loss(ws, wadd, s, images, captions; pdrop=0.0)
     else
         visual = transpose(vgg16(wadd, images; pdrop=pdrop))
     end
-    decoder(ws[end-5:end], s, visual, captions; pdrop=pdrop)
+    return decoder(ws[end-5:end], s, visual, captions; pdrop=pdrop)
 end
 
 # loss gradient
@@ -97,8 +97,9 @@ function generate(w1, w2, s, image, vocab, maxlen)
     len = 1
 
     while word != EOS && len < maxlen
-        x = reshape(word2onehot(vocab, word), 1, vocab.size)
-        x = convert(atype, x) * w2[6]
+        onehotvec = zeros(Cuchar, 1, vocab.size)
+        onehotvec[word2index(vocab, word)] = 1
+        x = convert(atype, onehotvec) * w2[6]
         (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x);
         ypred = s[1] * w2[3] .+ w2[4]
         ypred = convert(Array{Float32}, ypred)

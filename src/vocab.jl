@@ -1,6 +1,5 @@
 SOS = "<sos>" # start of sentence token
 EOS = "<eos>" # end of sentence token
-PAD = "<pad>" # padding token
 UNK = "<unk>" # token for unknown words
 
 type Vocabulary
@@ -34,8 +33,7 @@ type Vocabulary
         end
 
         w2i[EOS] = i
-        w2i[PAD] = i+1
-        w2i[UNK] = i+2
+        w2i[UNK] = i+1
 
         # build index2word array
         i2w = map(j -> "", zeros(i+2))
@@ -55,6 +53,4 @@ word2onehot(voc::Vocabulary, w) = (v = zeros(atype,voc.size,1); v[word2index(voc
 sen2vec(voc::Vocabulary, s) = mapreduce(w -> word2index(voc, w), vcat, vcat(SOS, s, EOS))
 word2svec(voc::Vocabulary, w) = (v = map(atype,spzeros(voc.size,1)); v[word2index(voc, w)] = 1; v)
 sen2smat(voc::Vocabulary, s) = mapreduce(w -> word2svec(voc, w), hcat, [SOS;s;EOS])
-pad2index(voc::Vocabulary) = word2index(voc, PAD)
-pad2oneheot(voc::Vocabulary) = word2onehot(voc, PAD) 
 vec2sen(voc::Vocabulary, vec) = join(map(i -> index2word(voc,i), vec[2:end-1]), " ")

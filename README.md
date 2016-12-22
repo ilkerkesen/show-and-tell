@@ -1,4 +1,3 @@
-# kusrp
-[![Documentation Status](https://readthedocs.org/projects/kusrp/badge/?version=latest)](http://kusrp.readthedocs.io/en/latest/?badge=latest)
+# Show and Tell: A Neural Image Caption Generator
 
-Deep Image Captioning project performed during KUSRP 2016
+Show and Tell: A Neural Image Caption Generator Knet v0.8 implementation (work in progress).
