@@ -44,9 +44,6 @@ function vgg16(w, x; pdrop=0.0, mode=1, featuremaps=false)
 
     fc7 = w[29] * mat(fc6) .+ w[30]
     fc7 = relu(fc7)
-    if pdrop > 0
-        fc7 = dropout(fc7, pdrop)
-    end
 
     if !featuremaps
         return fc7

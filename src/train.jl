@@ -148,6 +148,7 @@ end
 # one epoch training
 function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, pdrop=0.0)
     for batch in batches
+        flush(STDOUT)
         _, img, cap = batch
         gloss = lossgradient(ws, wadd, copy(s), img, cap; pdrop=pdrop)
         gscale = lr
