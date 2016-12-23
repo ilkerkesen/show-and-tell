@@ -34,7 +34,7 @@ function main(args)
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--batchshuffle"; action=:store_true)
         ("--finetune"; action=:store_true; help="CNN fine tuning")
-        ("--dropout"; arg_type=Float32; default=Float32(0.0); help="dropout")
+        ("--dropout"; arg_type=Float32; default=Float32(0.5); help="dropout")
         ("--lastlayer"; default="relu7"; help="last layer for feature extraction")
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--test"; action=:store_true; help="testing with a small set")
@@ -120,7 +120,7 @@ function main(args)
         if o[:gcheck] > 0
             gradcheck(loss, ws, wadd, s, trn[1][2:end]...; gcheck=o[:gcheck])
         end
-        @printf("epoch:%d softloss:%g/%g (time elapsed: %s) [%s]\n",
+        @printf("\nepoch:%d loss(train/val):%g/%g (time elapsed: %s) [%s]\n",
                 epoch, losstrn, lossval, pretty_time(epochtime), now())
         flush(STDOUT)
 
