@@ -84,7 +84,7 @@ function decoder(w, s, vis, seq; pdrop=0.0)
 end
 
 # generate
-function generate(w1, w2, s, image, vocab, maxlen)
+function generate(w1, w2, s, image, vocab, maxlen; beamsize=1)
     atype = typeof(AutoGrad.getval(w2[1]))
     image = KnetArray(image)
     vis = vgg16(w1, image)
@@ -102,7 +102,7 @@ function generate(w1, w2, s, image, vocab, maxlen)
         x = convert(atype, onehotvec) * w2[6]
         (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x);
         ypred = s[1] * w2[3] .+ w2[4]
-        ypred = convert(Array{Float32}, ypred)
+        ypred = convert(Array{Float32}, ypred)[:]
         word = index2word(vocab, indmax(ypred))
         push!(sentence, word)
         len += 1
@@ -111,6 +111,8 @@ function generate(w1, w2, s, image, vocab, maxlen)
     if word == EOS
         pop!(sentence)
     end
-
-    return join(sentence[2:end], " ")
+    push!(sentence, ".")
+    output = join(sentence[2:end], " ")
+    output = string(uppercase(output[1]), output[2:end])
+    return output
 end
