@@ -1,5 +1,9 @@
 # VGG16 model for convolutional feature extraction
-function vgg16(w, x; pdrop=0.0, mode=1, featuremaps=false)
+function vgg16(w, x; dropouts=Dict(), mode=1, featuremaps=false)
+    # get dropouts
+    fc6drop = get(dropouts, "fc6drop", 0.0)
+    fc7drop = get(dropouts, "fc7drop", 0.0)
+
     conv1_1 = conv4(w[1], x; padding=1, mode=mode) .+ w[2]
     conv1_1 = relu(conv1_1)
     conv1_2 = conv4(w[3], conv1_1; padding=1, mode=mode) .+ w[4]
@@ -38,12 +42,10 @@ function vgg16(w, x; pdrop=0.0, mode=1, featuremaps=false)
 
     fc6 = w[27] * mat(pool5) .+ w[28]
     fc6 = relu(fc6)
-    if pdrop > 0
-        fc6 = dropout(fc6, pdrop)
-    end
-
+    fc6 = dropout(fc6, fc6drop)
     fc7 = w[29] * mat(fc6) .+ w[30]
     fc7 = relu(fc7)
+    fc7 = dropout(fc7, fc7drop)
 
     if !featuremaps
         return fc7

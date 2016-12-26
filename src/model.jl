@@ -1,15 +1,21 @@
 # dropout layer
-dropout(x,d) = x .* (rand!(similar(AutoGrad.getval(x))) .> d) * (1/(1-d))
+function dropout(x,d)
+    if d > 0
+        return x .* (rand!(similar(AutoGrad.getval(x))) .> d) * (1/(1-d))
+    else
+        return x
+    end
+end
 
 # loss function
-function loss(ws, wadd, s, images, captions; pdrop=0.0)
+function loss(ws, wadd, s, images, captions; dropouts=Dict())
     images = KnetArray(images)
     if wadd == nothing
-        visual = transpose(vgg16(ws[1:end-6], images; pdrop=pdrop))
+        visual = transpose(vgg16(ws[1:end-6], images; dropouts=dropouts))
     else
-        visual = transpose(vgg16(wadd, images; pdrop=pdrop))
+        visual = transpose(vgg16(wadd, images; dropouts=dropouts))
     end
-    return decoder(ws[end-5:end], s, visual, captions; pdrop=pdrop)
+    return decoder(ws[end-5:end], s, visual, captions; dropouts=dropouts)
 end
 
 # loss gradient
@@ -40,7 +46,6 @@ function initweights(atype, hidden, visual, vocab, embed, winit)
     return map(i->convert(atype, i), w)
 end
 
-
 # LSTM model - input * weight, concatenated weights
 function lstm(weight, bias, hidden, cell, input)
     gates   = hcat(input,hidden) * weight .+ bias;
@@ -54,25 +59,31 @@ function lstm(weight, bias, hidden, cell, input)
     return (hidden,cell)
 end
 
-
 # loss function for decoder network
-function decoder(w, s, vis, seq; pdrop=0.0)
-    total, count = 0, 0;
-    atype = typeof(AutoGrad.getval(w[1]));
+function decoder(w, s, vis, seq; dropouts=Dict())
+    total, count = 0, 0
+    atype = typeof(AutoGrad.getval(w[1]))
+
+    # set dropouts
+    vembdrop = get(dropouts, "vembdrop", 0.0)
+    wembdrop = get(dropouts, "wembdrop", 0.0)
+    softdrop = get(dropouts, "softdrop", 0.0)
 
     # visual features
-    x =  vis * w[5];
-    (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x);
+    x = vis * w[5]
+    x = dropout(x, vembdrop)
+
+    # feed LSTM with visual embeddings
+    (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x)
 
     # textual features
     x = convert(atype, seq[1]);
     for i = 1:length(seq)-1
-        x = x * w[6];
+        x = x * w[6]
+        x = dropout(x, wembdrop)
         (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x)
         ht = s[1]
-        if pdrop > 0.0
-            ht = dropout(ht, pdrop)
-        end
+        ht = dropout(ht, softdrop)
         ypred = logp(ht * w[3] .+ w[4], 2);
         ygold = convert(atype, seq[i+1]);
         total += sum(ygold .* ypred);

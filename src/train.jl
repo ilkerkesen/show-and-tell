@@ -30,12 +30,19 @@ function main(args)
         ("--batchsize"; arg_type=Int; default=16)
         ("--lr"; arg_type=Float32; default=Float32(2.0))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
-        ("--seed"; arg_type=Int; default=1)
+        ("--seed"; arg_type=Int; default=1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
-        ("--batchshuffle"; action=:store_true)
-        ("--finetune"; action=:store_true; help="CNN fine tuning")
-        ("--dropout"; arg_type=Float32; default=Float32(0.5); help="dropout")
-        ("--lastlayer"; default="relu7"; help="last layer for feature extraction")
+        ("--batchshuffle"; action=:store_true; help="shuffle batches")
+        ("--finetune"; action=:store_true; help="fine tune convnet")
+        ("--dropout"; arg_type=Float32; default=Float32(0.5))
+        ("--fc6drop"; arg_type=Float32; default=Float32(0.5))
+        ("--fc7drop"; arg_type=Float32; default=Float32(0.5))
+        ("--softdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--wembdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--vembdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
+        ("--decayperiod"; arg_type=Int; default=0; help="lr decay period")
+        ("--lastlayer"; default="relu7"; help="convnet last layer")
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--test"; action=:store_true; help="testing with a small set")
     end
@@ -46,8 +53,19 @@ function main(args)
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
     o[:seed] > 0 && srand(o[:seed])
 
+    # set learning rate
+    lr = o[:lr]
+    decay = o[:decay]
+    decayperiod = o[:decayperiod]
+
     # set dropouts
-    pdrop = o[:dropout]
+    dropouts = Dict(
+        "fc6" => o[:fc6drop],
+        "fc7" => o[:fc7drop],
+        "soft" => o[:softdrop],
+        "wemb" => o[:wembdrop],
+        "vemb" => o[:vembdrop]
+    )
 
     # load data
     imgdata = load(o[:images])
@@ -114,15 +132,21 @@ function main(args)
     flush(STDOUT)
     for epoch = 1:o[:epochs]
         _, epochtime = @timed train!(
-            ws, wadd, s, trn; pdrop=pdrop, lr=o[:lr], gclip=o[:gclip])
+            ws, wadd, s, trn;
+            lr=lr, gclip=o[:gclip], dropouts=dropouts)
         losstrn = o[:fast] ? NaN : test(ws, wadd, s, trn)
         lossval = test(ws, wadd, s, val)
         if o[:gcheck] > 0
             gradcheck(loss, ws, wadd, s, trn[1][2:end]...; gcheck=o[:gcheck])
         end
-        @printf("\nepoch:%d loss(train/val):%g/%g (time elapsed: %s) [%s]\n",
-                epoch, losstrn, lossval, pretty_time(epochtime), now())
+        @printf("\nepoch:%d loss(train/val):%g/%g (lr: %g, time: %s) [%s]\n",
+                epoch, losstrn, lossval, lr, pretty_time(epochtime), now())
         flush(STDOUT)
+
+        # learning rate decay
+        if decayperiod > 0 && epoch % decayperiod == 0
+            lr *= decay
+        end
 
         # shuffle batches
         o[:batchshuffle] && shuffle!(trn)
@@ -146,11 +170,10 @@ function main(args)
 end
 
 # one epoch training
-function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, pdrop=0.0)
+function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, dropouts=Dict())
     for batch in batches
-        flush(STDOUT)
         _, img, cap = batch
-        gloss = lossgradient(ws, wadd, copy(s), img, cap; pdrop=pdrop)
+        gloss = lossgradient(ws, wadd, copy(s), img, cap; dropouts=dropouts)
         gscale = lr
         if gclip > 0
             gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
@@ -167,14 +190,22 @@ function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, pdrop=0.0)
         for i = 1:length(s)
             s[i] = AutoGrad.getval(s[i])
         end
+        flush(STDOUT)
     end
 end
 
 # split testing
-test(ws, wadd, s, data) = mean(map(b -> batchtest(ws, wadd, s, b), data))
-
-# one minibatch testing
-batchtest(ws, wadd, s, b) = loss(ws, wadd, copy(s), b[2], b[3])
+function test(ws, wadd, s, batches)
+    total = 0.0
+    count = 0
+    for batch in batches
+        _, img, cap = batch
+        total += loss(ws, wadd, copy(s), img, cap)
+        count += 1
+        flush(STDOUT)
+    end
+    return total/count
+end
 
 # Knet array to Float32 array conversion
 karr2arr(ws) = map(w -> convert(Array{Float32}, w), ws);
