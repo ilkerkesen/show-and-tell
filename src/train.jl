@@ -60,11 +60,11 @@ function main(args)
 
     # set dropouts
     dropouts = Dict(
-        "fc6" => o[:fc6drop],
-        "fc7" => o[:fc7drop],
-        "soft" => o[:softdrop],
-        "wemb" => o[:wembdrop],
-        "vemb" => o[:vembdrop]
+        "fc6drop" => o[:fc6drop],
+        "fc7drop" => o[:fc7drop],
+        "softdrop" => o[:softdrop],
+        "wembdrop" => o[:wembdrop],
+        "vembdrop" => o[:vembdrop]
     )
 
     # load data
