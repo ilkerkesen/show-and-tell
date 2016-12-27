@@ -102,28 +102,61 @@ function generate(w1, w2, s, image, vocab, maxlen; beamsize=1)
     x = transpose(vis) * w2[5]
     (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x)
 
-    # language generation
-    word = SOS
-    sentence = Any[word]
-    len = 1
+    # language generation with (sentence, state, probability) array
+    sentences = Any[(Any[SOS],s,0.0)]
+    while true
+        changed = false
+        for i = 1:beamsize
+            # get current sentence
+            curr = shift!(sentences)
+            sentence, st, prob = curr
 
-    while word != EOS && len < maxlen
-        onehotvec = zeros(Cuchar, 1, vocab.size)
-        onehotvec[word2index(vocab, word)] = 1
-        x = convert(atype, onehotvec) * w2[6]
-        (s[1], s[2]) = lstm(w2[1], w2[2], s[1], s[2], x);
-        ypred = s[1] * w2[3] .+ w2[4]
-        ypred = convert(Array{Float32}, ypred)[:]
-        word = index2word(vocab, indmax(ypred))
-        push!(sentence, word)
-        len += 1
+            # get last word
+            word = sentence[end]
+            if word == EOS || length(sentence) >= maxlen
+                push!(sentences, curr)
+                continue
+            end
+
+            # get probabilities
+            onehotvec = zeros(Cuchar, 1, vocab.size)
+            onehotvec[word2index(vocab, word)] = 1
+            x = convert(atype, onehotvec) * w2[6]
+            (st[1], st[2]) = lstm(w2[1], w2[2], st[1], st[2], x)
+            ypred = logp(st[1] * w2[3] .+ w2[4], 2)
+            ypred = convert(Array{Float32}, ypred)[:]
+
+            # add most probable predictions to array
+            maxinds = sortperm(ypred, rev=true)
+            for j = 1:beamsize
+                ind = maxinds[j]
+                new_word = index2word(vocab, ind)
+                new_sentence = copy(sentence)
+                new_state = copy(st)
+                new_probability = prob + ypred[ind]
+                push!(new_sentence, new_word)
+                push!(sentences, (new_sentence, new_state, new_probability))
+            end
+            changed = true
+
+            # skip first loop
+            if word == SOS
+                break
+            end
+        end
+
+        orders = sortperm(map(x -> x[3], sentences), rev=true)
+        sentences = sentences[orders[1:beamsize]]
+
+        if !changed
+            break
+        end
     end
 
-    if word == EOS
+    sentence = first(sentences)[1]
+    if sentence[end] == EOS
         pop!(sentence)
     end
     push!(sentence, ".")
     output = join(sentence[2:end], " ")
-    output = string(uppercase(output[1]), output[2:end])
-    return output
 end

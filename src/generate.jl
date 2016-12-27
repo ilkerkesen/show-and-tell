@@ -15,6 +15,7 @@ function main(args)
         ("--captions"; help="data file contains vocabulary")
         ("--modelfile"; help="trained model file")
         ("--savedir"; help="save generations and references")
+        ("--beamsize"; arg_type=Int; default=1)
         ("--datasplit"; default="test"; help="data split is going to be used")
         ("--maxlen"; arg_type=Int; default=20; help="max sentence length")
         ("--nogpu"; action=:store_true)
@@ -46,9 +47,6 @@ function main(args)
     vocab = load(o[:captions], "vocab")
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
 
-    # testing, I usually use this for train split
-    o[:testing] && o[:shuffle] && shuffle!(tst)
-
     # load weights
     atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
     w1 = load(o[:modelfile], "w1")
@@ -69,7 +67,8 @@ function main(args)
         filename1 == filename2 || error("filename mismatch")
         image = images[i][2]
         sentences = map(s -> s[1], captions[i][2])
-        generated = generate(w1, w2, copy(s), image, vocab, o[:maxlen])
+        generated = generate(
+            w1, w2, copy(s), image, vocab, o[:maxlen]; beamsize=o[:beamsize])
         o[:debug] && report_generation(filename1, generated, sentences)
         push!(filenames, filename1)
         push!(references, sentences)

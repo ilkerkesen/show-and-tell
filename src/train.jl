@@ -40,7 +40,6 @@ function main(args)
         ("--wembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
-        ("--decayperiod"; arg_type=Int; default=0; help="lr decay period")
         ("--lastlayer"; default="relu7"; help="convnet last layer")
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--test"; action=:store_true; help="testing with a small set")
@@ -55,7 +54,6 @@ function main(args)
     # set learning rate
     lr = o[:lr]
     decay = o[:decay]
-    decayperiod = o[:decayperiod]
 
     # set dropouts
     dropouts = Dict(
@@ -143,7 +141,7 @@ function main(args)
         flush(STDOUT)
 
         # learning rate decay
-        if decayperiod > 0 && epoch % decayperiod == 0
+        if lossval > bestloss
             lr *= decay
         end
 
