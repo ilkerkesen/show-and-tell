@@ -102,6 +102,7 @@ function main(args)
     # initialize state & weights
     # w1 -> CNN | w2 -> RNN, embeddings
     bestloss = Inf
+    prevloss = Inf
     if o[:loadfile] == nothing
         vggmat = matread(o[:cnnfile])
         w1 = get_vgg_weights(vggmat; last_layer=o[:lastlayer])
@@ -111,6 +112,7 @@ function main(args)
         w1 = load(o[:loadfile], "w1")
         w2 = load(o[:loadfile], "w2")
         bestloss = load(o[:loadfile], "lossval")
+        prevloss = bestloss
         save(o[:savefile], "w1", w1, "w2", w2, "lossval", bestloss)
         w1 = map(i->convert(atype, i), w1)
         w2 = map(i->convert(atype, i), w2)
@@ -141,7 +143,7 @@ function main(args)
         flush(STDOUT)
 
         # learning rate decay
-        if lossval > bestloss
+        if lossval > prevloss
             lr *= decay
         end
 
@@ -149,6 +151,7 @@ function main(args)
         o[:batchshuffle] && shuffle!(trn)
 
         # save model
+        prevloss = lossval
         (o[:savefile] != nothing && lossval < bestloss) || continue
         bestloss = lossval
         if o[:finetune]
