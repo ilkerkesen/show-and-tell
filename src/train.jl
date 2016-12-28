@@ -39,10 +39,10 @@ function main(args)
         ("--softdrop"; arg_type=Float32; default=Float32(0.0))
         ("--wembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
+        ("--membdrop"; arg_type=Float32; default=Float32(0.0))
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
         ("--lastlayer"; default="relu7"; help="convnet last layer")
         ("--fast"; action=:store_true; help="do not compute train loss")
-        ("--test"; action=:store_true; help="testing with a small set")
     end
 
     # parse args
@@ -61,7 +61,8 @@ function main(args)
         "fc7drop" => o[:fc7drop],
         "softdrop" => o[:softdrop],
         "wembdrop" => o[:wembdrop],
-        "vembdrop" => o[:vembdrop]
+        "vembdrop" => o[:vembdrop],
+        "membdrop" => o[:membdrop]
     )
 
     # load data
@@ -91,10 +92,6 @@ function main(args)
     println("val => time: ", pretty_time(t2), " mem: ", m2,
             " length: ", length(val))
     flush(STDOUT)
-    if o[:test]
-        trn = trn[1:20]
-        val = val[1:10]
-    end
 
     atype = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     vocabsize = vocab.size
@@ -118,6 +115,7 @@ function main(args)
         w2 = map(i->convert(atype, i), w2)
     end
     s = initstate(atype, size(w2[3], 1), o[:batchsize])
+    w1len = length(w1)
 
     ws, wadd = nothing, nothing
     if o[:finetune]
@@ -130,14 +128,16 @@ function main(args)
     @printf("Training has been started (lossval=%g). [%s]\n", bestloss, now())
     flush(STDOUT)
     for epoch = 1:o[:epochs]
+        if o[:gcheck] > 0
+            gradcheck(loss, ws, wadd, s, trn[1][2:end]...; gcheck=o[:gcheck])
+        end
+
+        # one epoch training + testing
         _, epochtime = @timed train!(
             ws, wadd, s, trn;
             lr=lr, gclip=o[:gclip], dropouts=dropouts)
         losstrn = o[:fast] ? NaN : test(ws, wadd, s, trn)
         lossval = test(ws, wadd, s, val)
-        if o[:gcheck] > 0
-            gradcheck(loss, ws, wadd, s, trn[1][2:end]...; gcheck=o[:gcheck])
-        end
         @printf("\nepoch:%d loss(train/val):%g/%g (lr: %g, time: %s) [%s]\n",
                 epoch, losstrn, lossval, lr, pretty_time(epochtime), now())
         flush(STDOUT)
@@ -156,8 +156,8 @@ function main(args)
         bestloss = lossval
         if o[:finetune]
             save(o[:savefile],
-                 "w1", karr2arr(ws[1:end-6]),
-                 "w2", karr2arr(ws[end-5:end]),
+                 "w1", karr2arr(ws[1:w1len]),
+                 "w2", karr2arr(ws[w1len+1:end]),
                  "lossval", bestloss)
         else
             save(o[:savefile],
