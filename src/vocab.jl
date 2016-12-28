@@ -36,12 +36,13 @@ type Vocabulary
         w2i[UNK] = i+1
 
         # build index2word array
-        i2w = map(j -> "", zeros(i+2))
+        vocabsize = length(values(w2i))
+        i2w = map(j -> "", zeros(vocabsize))
         for (k,v) in w2i
             i2w[v] = k
         end
 
-        new(counts, sorted, w2i, i2w, i+2, min_occur)
+        new(counts, sorted, w2i, i2w, vocabsize, min_occur)
     end
 end
 
