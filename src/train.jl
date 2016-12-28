@@ -28,12 +28,13 @@ function main(args)
         ("--winit"; arg_type=Float32; default=Float32(0.01))
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=16)
-        ("--lr"; arg_type=Float32; default=Float32(2.0))
+        ("--lr"; arg_type=Float32; default=Float32(0.001))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--batchshuffle"; action=:store_true; help="shuffle batches")
         ("--finetune"; action=:store_true; help="fine tune convnet")
+        ("--adam"; action=:store_true; help="use adam optimizer")
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
         ("--fc7drop"; arg_type=Float32; default=Float32(0.0))
         ("--softdrop"; arg_type=Float32; default=Float32(0.0))
@@ -115,13 +116,25 @@ function main(args)
         w2 = map(i->convert(atype, i), w2)
     end
     s = initstate(atype, size(w2[3], 1), o[:batchsize])
-    w1len = length(w1)
 
     ws, wadd = nothing, nothing
     if o[:finetune]
         ws = [w1; w2]
     else
         wadd, ws = w1, w2
+    end
+
+    wslen = length(ws)
+    w1len = length(w1)
+
+    # parameters for adam optimization
+    optparams = Array(Any, wslen)
+    for i = 1:wslen
+        if o[:adam]
+            optparams[i] = Adam(ws[i])
+        else
+            optparams[i] = Sgd(ws[i])
+        end
     end
 
     # training
@@ -134,7 +147,7 @@ function main(args)
 
         # one epoch training + testing
         _, epochtime = @timed train!(
-            ws, wadd, s, trn;
+            ws, wadd, s, trn, optparams;
             lr=lr, gclip=o[:gclip], dropouts=dropouts)
         losstrn = o[:fast] ? NaN : test(ws, wadd, s, trn)
         lossval = test(ws, wadd, s, val)
@@ -170,10 +183,12 @@ function main(args)
 end
 
 # one epoch training
-function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, dropouts=Dict())
+function train!(ws, wadd, s, batches, optparams; lr=0.0, gclip=0.0, dropouts=Dict())
     for batch in batches
         _, img, cap = batch
         gloss = lossgradient(ws, wadd, copy(s), img, cap; dropouts=dropouts)
+
+        # gradient clipping
         gscale = lr
         if gclip > 0
             gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
@@ -182,8 +197,10 @@ function train!(ws, wadd, s, batches; lr=0.0, gclip=0.0, dropouts=Dict())
             end
         end
 
+        # updateparams
         for k in 1:length(ws)
-            axpy!(-gscale, gloss[k], ws[k])
+            optparams[k].lr = gscale
+            update!(ws[k], gloss[k], optparams[k])
         end
 
         isa(s,Vector{Any}) || error("State should not be Boxed.")
