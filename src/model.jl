@@ -78,9 +78,6 @@ function decoder(w, s, vis, seq; dropouts=Dict())
     x = dropout(x, vembdrop)
 
     # feed LSTM with visual embeddings
-    info("w[1]: ", size(w[1]))
-    info("w[2]: ", size(w[2]))
-    info("x: ", size(x))
     (s[1], s[2]) = lstm(w[1], w[2], s[1], s[2], x)
 
     # textual features
@@ -104,8 +101,6 @@ end
 # one epoch training
 function train!(w, s, data, optparams; lr=0.0, gclip=0.0, dropouts=Dict(), finetune=false)
     for batch in data
-        info("batch[2]: ", size(batch[2]))
-        info("batch[3]: ", size(batch[3]))
         gloss = lossgradient(w, copy(s), batch[2:end]...; dropouts=dropouts, finetune=finetune)
 
         # gradient clipping
