@@ -1,3 +1,6 @@
+# Knet array to Float32 array conversion
+karr2arr(ws) = map(w -> convert(Array{Float32}, w), ws)
+
 function extract_file_from_tar(tar, from, to)
     sc = count(x->x=='/', from[1:end-1])
     run(`tar -xf $tar --strip-components=$sc -C $to --directory $from`)

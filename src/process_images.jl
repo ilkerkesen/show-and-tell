@@ -17,32 +17,45 @@ function main(args)
         ("--feedback"; arg_type=Int; default=0;
          help="period of displaying number of images processed")
         ("--debug"; action=:store_true)
+        ("--seed"; arg_type=Int; default=1; help="random seed")
+        ("--nocrop"; action=:store_true)
+        ("--randomcrop"; action=:store_true)
+        ("--extradata"; action=:store_true)
     end
 
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+    o[:seed] > 0 && srand(o[:seed])
 
     imgpath = abspath(o[:images])
     capfile = abspath(o[:captions])
     newsize = tuple(o[:imsize]...)
     rgbmean = reshape(o[:rgbmean], (1,1,3))
+    crop = !o[:nocrop]
 
     # process images
     data = Dict()
     for splitname in SPLITS
-        @printf("Processing %s split... [%s]\n", splitname, now()); flush(STDOUT)
+        @printf("Processing %s split... [%s]\n", splitname, now())
+        flush(STDOUT)
+
+        randomcrop = false
+        if splitname == "train" || (splitname == "restval" && o[:extradata])
+            randomcrop = o[:randomcrop]
+        end
+
         filenames = get_filenames(capfile, splitname)
         splitdata = []
         counter = 0
         for f in filenames
-            # debug
             if o[:debug]
                 @printf("Image: %s\n", f); flush(STDOUT)
             end
 
             # processing
             img = read_image(f, imgpath)
-            img = process_image(img, newsize, rgbmean)
+            img = process_image(
+                img, newsize, rgbmean; crop=crop, randomcrop=randomcrop)
             push!(splitdata, (f, img))
 
             # feedback
@@ -77,11 +90,27 @@ function get_filenames(zip, split)
     return map(j -> j["filename"], filter(i -> i["split"] == split, images))
 end
 
-function process_image(img, newsize, rgbmean)
-    a1 = Images.imresize(img, newsize) # resize image
+function process_image(img, newsize, rgbmean; crop=true, randomcrop=false)
+    scaled = ntuple(i->div(size(img,i)*newsize[i],minimum(size(img))),2)
+    a1 = Images.imresize(img, scaled)
+
+    # randomcrop vs. centercrop
+    if randomcrop
+        offsets = ntuple(i->rand(1:scaled[i]-minimum(scaled)+1),2)
+    else
+        offsets = ntuple(i->div(size(a1,i)-newsize[i],2)+1,2)
+    end
+
+    if crop
+        a1 = a1[offsets[1]:offsets[1]+newsize[1]-1,
+                offsets[2]:offsets[2]+newsize[2]-1]
+    else
+        a1 = Images.imresize(a1, newsize)
+    end
+
     b1 = separate(a1) # separate image channels, build a tensor
-    colordim = b1.properties["colordim"]
-    colorspace = b1.properties["colorspace"]
+    colordim = size(b1, 3)
+    colorspace = img.properties["colorspace"]
     if colordim != 3 || colorspace == "Gray"
         c1 = convert(Array{Float32}, b1.data)
         c1 = cat(3, cat(3, c1, c1), c1)

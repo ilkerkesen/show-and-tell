@@ -11,9 +11,10 @@ function main(args)
     s.description = "Caption generation script for the model."
 
     @add_arg_table s begin
-        ("--images"; help="data file contains vocabulary")
+        ("--visual"; help="data file contains vocabulary")
         ("--captions"; help="data file contains vocabulary")
         ("--modelfile"; help="trained model file")
+        ("--cnnfile"; help="convnet file for non-finetuned model")
         ("--savedir"; help="save generations and references")
         ("--beamsize"; arg_type=Int; default=1)
         ("--datasplit"; default="test"; help="data split is going to be used")
@@ -42,33 +43,36 @@ function main(args)
     savedir = abspath(o[:savedir])
 
     # load data
-    images = load(o[:images], o[:datasplit])
+    visuals = load(o[:visual], o[:datasplit])
     captions = load(o[:captions], o[:datasplit])
     vocab = load(o[:captions], "vocab")
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
 
     # load weights
     atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
-    w1 = load(o[:modelfile], "w1")
-    w2 = load(o[:modelfile], "w2")
+    w = load(o[:modelfile], "w")
+    w = map(i->convert(atype, i), w)
     lossval = load(o[:modelfile], "lossval")
-    w1 = map(i->convert(atype, i), w1)
-    w2 = map(i->convert(atype, i), w2)
-    s = initstate(atype, size(w2[3], 1), 1)
+    s = initstate(atype, size(w[3], 1), 1)
+
+    wcnn = load(o[:modelfile], "wcnn")
+    if wcnn != nothing
+        wcnn = map(i->convert(atype, i), wcnn)
+    end
 
     # generate captions
     counter, ti = 0, now()
     filenames, references, generations = [], [], []
     @printf("Generation started (loss=%g,date=%s)\n", lossval, now())
     flush(STDOUT)
-    for i = 1:length(images)
+    for i = 1:length(visuals)
         o[:testing] && counter >= o[:amount] && break
-        filename1, filename2 = images[i][1], captions[i][1]
+        filename1, filename2 = visuals[i][1], captions[i][1]
         filename1 == filename2 || error("filename mismatch")
-        image = images[i][2]
+        visual = visuals[i][2]
         sentences = map(s -> s[1], captions[i][2])
         generated = generate(
-            w1, w2, copy(s), image, vocab, o[:maxlen]; beamsize=o[:beamsize])
+            w, wcnn, copy(s), visual, vocab, o[:maxlen]; beamsize=o[:beamsize])
         o[:debug] && report_generation(filename1, generated, sentences)
         push!(filenames, filename1)
         push!(references, sentences)

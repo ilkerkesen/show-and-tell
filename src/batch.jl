@@ -1,13 +1,14 @@
 # generate minibatches
-function make_batches(images, captions, vocab, batchsize)
-    nimages = length(images)
-    if nimages != length(captions)
-        error("dimensions mismatch (images/captions)")
+function make_batches(visuals, captions, vocab, batchsize; finetune=false)
+    catdim = finetune ? 4 : 1
+    nvisuals = length(visuals)
+    if nvisuals != length(captions)
+        error("dimensions mismatch (visuals/captions)")
     end
 
     data = []
-    for i = 1:nimages
-        filename1, image = images[i]
+    for i = 1:nvisuals
+        filename1, image = visuals[i]
         filename2, sentences = captions[i]
         filename1 == filename2 || error("filename mismatch")
         for sentence in sentences
@@ -30,7 +31,7 @@ function make_batches(images, captions, vocab, batchsize)
 
         # batch data
         bfilenames = map(s -> s[1], samples)
-        bimages = mapreduce(s -> s[2], (x...) -> cat(4, x...), samples)
+        bvisuals = mapreduce(s -> s[2], (x...) -> cat(catdim, x...), samples)
         bcaptions = map(
             i -> zeros(Cuchar, upper-lower+1, vocab.size), [1:longest...])
 
@@ -40,7 +41,7 @@ function make_batches(images, captions, vocab, batchsize)
                  [1:length(vectors[i])...])
         end
 
-        push!(batches, (bfilenames, bimages, bcaptions))
+        push!(batches, (bfilenames, bvisuals, bcaptions))
     end
 
     return batches

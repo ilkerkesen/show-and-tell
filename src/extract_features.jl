@@ -1,31 +1,35 @@
 using Knet, ArgParse, JLD, MAT
 include("convnet.jl")
-
+SPLITS = ["train", "restval", "val", "test"]
 
 function main(args)
     s = ArgParseSettings()
-    s.description = "Extract CNN features of images (now only just for VGG-16)"
+    s.description = "Extract CNN features of images (now only just for VGG-19)"
 
     @add_arg_table s begin
         ("--images"; help="image data file in JLD format")
         ("--cnnfile"; help="CNN model file")
         ("--savefile"; help="extracted features output file")
-        ("--lastlayer"; default="relu7"; help="last layer for feature extraction")
-        ("--batchsize"; arg_type=Int; default=10; help="batch size for extraction")
-        ("--dropout"; arg_type=Float32; default=Float32(0.5))
+        ("--lastlayer"; default="relu7"; help="layer for feature extraction")
+        ("--batchsize"; arg_type=Int; default=10; help="batchsize")
+        ("--seed"; arg_type=Int; default=1; help="random seed")
+        ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
+        ("--fc7drop"; arg_type=Float32; default=Float32(0.0))
         ("--feedback"; arg_type=Int; default=0; help="feedback in every N image")
+        ("--extradata"; action=:store_true)
     end
 
     # parse args
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+    o[:seed] > 0 && srand(o[:seed])
+
 
     # load data
     @printf("Data and model loading... "); flush(STDOUT)
     images = load(o[:images])
     batchsize = o[:batchsize]
     lastlayer = o[:lastlayer]
-    dropout = o[:dropout]
     CNN = matread(o[:cnnfile])
     weights = get_vgg_weights(CNN; last_layer=lastlayer)
     features = Dict()
@@ -36,9 +40,13 @@ function main(args)
         @printf("Feature extraction for %s split...\n", splitname); flush(STDOUT)
         splitdata = Any[]
         counter = 0
+        dropouts = Dict()
+        if splitname == "train" || (splitname == "restval" && o[:extradata])
+            dropouts = Dict("fc6drop" => o[:fc6drop], "fc7drop" => o[:fc7drop])
+        end
         for entry in images[splitname]
             filename, image = entry
-            feats = vgg16(weights, KnetArray(image); pdrop=dropout)
+            feats = vgg19(weights, KnetArray(image); dropouts=dropouts)
             feats = convert(Array{Float32}, feats)
             feats = reshape(feats, 1, length(feats))
             push!(splitdata, (filename, feats))
