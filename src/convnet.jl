@@ -104,7 +104,7 @@ function vgg19(w, x; dropouts=Dict(), mode=1, featuremaps=false)
     conv5_2 = relu(conv5_2)
     conv5_3 = conv4(w[29], conv5_2; padding=1, mode=mode) .+ w[30]
     conv5_3 = relu(conv5_3)
-    conv5_4 = conv4(w[31], conv5_2; padding=1, mode=mode) .+ w[32]
+    conv5_4 = conv4(w[31], conv5_3; padding=1, mode=mode) .+ w[32]
     conv5_4 = relu(conv5_4)
 
     if featuremaps
