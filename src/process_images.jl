@@ -112,7 +112,7 @@ function process_image(img, newsize, rgbmean; crop=true, randomcrop=false)
     colordim = size(b1, 3)
     colorspace = img.properties["colorspace"]
     if colordim != 3 || colorspace == "Gray"
-        c1 = convert(Array{Float32}, b1.data)
+        c1 = convert(Array{Float32}, b1)
         c1 = cat(3, cat(3, c1, c1), c1)
     else
         c1 = convert(Array{Float32}, b1) # type conversion

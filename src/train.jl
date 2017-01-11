@@ -27,13 +27,14 @@ function main(args)
         ("--winit"; arg_type=Float32; default=Float32(0.01))
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=256)
-        ("--lr"; arg_type=Float32; default=Float32(0.001))
+        ("--lr"; arg_type=Float32; default=Float32(0.01))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--batchshuffle"; action=:store_true; help="shuffle batches")
         ("--finetune"; action=:store_true; help="fine tune convnet")
-        ("--adam"; action=:store_true; help="use adam optimizer")
+        ("--adam"; arg_type=Int; default=0; help="use adam optimizer")
+        ("--adamlr"; arg_type=Float32; default=Float32(0.001))
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
@@ -43,6 +44,10 @@ function main(args)
         ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--membdrop"; arg_type=Float32; default=Float32(0.0))
         ("--lastlayer"; default="relu7")
+        ("--patience"; arg_type=Int; default=0)
+        ("--saveperiod"; arg_type=Int; default=0)
+        ("--improvement"; arg_type=Float32; default=Float32(0.995))
+        ("--decayperiod"; arg_type=Int; default=0)
     end
 
     # parse args
@@ -97,7 +102,7 @@ function main(args)
     vocabsize = vocab.size
     visual = size(trn[1][2],2)
 
-    # initialize state & weights
+    # initialize state and weights
     bestloss = Inf
     prevloss = Inf
     if o[:loadfile] == nothing
@@ -113,6 +118,7 @@ function main(args)
     s = initstate(atype, size(w[3], 1), o[:batchsize])
 
     # fine tuning
+    woldlen = length(w)
     if o[:finetune] && o[:cnnfile]
         wcnn = get_vgg_weights(o[:cnnfile]; last_layer=o[:lastlayer])
         w = [wcnn; w]
@@ -122,61 +128,112 @@ function main(args)
         w = [wcnn; w]
     end
 
+
     # parameters for adam optimization
     wlen = length(w)
     optparams = Array(Any, wlen)
-    for i = 1:wlen
-        if o[:adam]
-            optparams[i] = Adam(w[i])
+    for k = 1:wlen
+        if o[:adam] > 0
+            optparams[k] = Adam(w[k])
         else
-            optparams[i] = Sgd(w[i])
+            optparams[k] = Sgd(;lr=o[:lr])
         end
+    end
+
+    if o[:adam] > 0
+        lr = o[:adamlr]
+    else
+        lr = o[:lr]
     end
 
     # gradient check
     if o[:gcheck] > 0
-        gradcheck(loss, w, s, trn[1][2:end]...; gcheck=o[:gcheck])
+        gradcheck(loss, w, s, trn[1][2], trn[1][3]; gcheck=o[:gcheck])
     end
 
     # training
+    nbatches = length(trn)
     @printf("Training has been started (lossval=%g). [%s]\n", bestloss, now())
-    flush(STDOUT)
-    for epoch = 1:o[:epochs]
-        # one epoch training + testing
-        _, epochtime = @timed train!(
-            w, s, trn, optparams;
-            lr=lr, gclip=o[:gclip], dropouts=dropouts)
-        losstrn = o[:fast] ? NaN : test(w, s, trn)
-        lossval = test(w, s, val)
-        @printf("\nepoch:%d loss(train/val):%g/%g (lr: %g, time: %s) [%s]\n",
-                epoch, losstrn, lossval, lr, pretty_time(epochtime), now())
-        flush(STDOUT)
+flush(STDOUT)
+saveperiod = o[:saveperiod] != 0 ? o[:saveperiod] : nbatches
+best_iter = 0
+patience = Inf
+if o[:patience] > 0
+    patience = o[:patience]
+end
+for epoch = 1:o[:epochs]
+    t0 = now()
 
-        # learning rate decay
-        if lossval > prevloss
-            lr *= decay
+    for i = 1:nbatches
+        iter = (epoch-1) * nbatches + i
+        train!(w, s, trn[i], optparams; lr=lr, gclip=o[:gclip], dropouts=dropouts)
+
+        if iter % saveperiod == 0
+            losstrn = o[:fast] ? NaN : test(w, s, trn)
+            lossval = test(w, s, val)
+            @printf(
+                "\nepoch/iter:%d/%d loss(train/val):%g/%g (lr: %g) [%s]\n",
+                epoch, iter, losstrn, lossval, lr, now())
+            flush(STDOUT)
+
+            # learning rate decay
+            if !(o[:adam] > 0 && o[:adam] <= epoch) && (lossval > prevloss)
+                @printf("\nlr decay...\n"); flush(STDOUT)
+                lr *= decay
+            end
+
+            # check best model
+            prevloss = lossval
+            if lossval > bestloss*o[:improvement]
+                if div(iter-best_iter, saveperiod) > patience
+                    @printf("\npatience exceed\n")
+                    flush(STDOUT)
+                    return
+                else
+                    continue
+                end
+            end
+            bestloss = lossval
+            best_iter = iter
+
+            # save model
+            if o[:savefile] == nothing
+                continue
+            end
+
+            if !o[:finetune]
+                save(o[:savefile],
+                     "wcnn", nothing,
+                     "w", karr2arr(w[end-woldlen+1:end]),
+                     "lossval", bestloss)
+            else
+                save(o[:savefile],
+                     "wcnn", karr2arr(w[1:end-woldlen]),
+                     "w", karr2arr(w[end-woldlen+1:end]),
+                     "lossval", bestloss)
+            end
+            @printf("Model saved.\n"); flush(STDOUT)
         end
-
-        # shuffle batches
-        o[:batchshuffle] && shuffle!(trn)
-
-        # save model
-        prevloss = lossval
-        (o[:savefile] != nothing && lossval < bestloss) || continue
-        bestloss = lossval
-        if !o[:finetune]
-            save(o[:savefile],
-                 "wcnn", nothing,
-                 "w", karr2arr(w[end-5:end]),
-                 "lossval", bestloss)
-        else
-            save(o[:savefile],
-                 "wcnn", karr2arr(w[1:end-6]),
-                 "w", karr2arr(w[end-5:end]),
-                 "lossval", bestloss)
-        end
-        @printf("Model saved.\n"); flush(STDOUT)
     end
+
+    t1 = now()
+    elapsed = Int64(round(Float64(t1-t0)*0.001))
+    @printf("\nepoch #%d finished. (time elapsed: %s)\n",
+            epoch, pretty_time(elapsed))
+    flush(STDOUT)
+
+    # shuffle batches
+    o[:batchshuffle] && shuffle!(trn)
+
+    if epoch == o[:adam]
+        lr = o[:lr]
+        @printf("switching to SGD.\n"); flush(STDOUT)
+        optparams = Array(Any, wlen)
+        for k = 1:wlen
+            optparams[k] = Sgd(;lr=lr)
+        end
+    end
+end
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

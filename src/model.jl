@@ -98,32 +98,32 @@ function decoder(w, s, vis, seq; dropouts=Dict())
     return -total / count
 end
 
-# one epoch training
-function train!(w, s, data, optparams; lr=0.0, gclip=0.0, dropouts=Dict(), finetune=false)
-    for batch in data
-        gloss = lossgradient(w, copy(s), batch[2:end]...; dropouts=dropouts, finetune=finetune)
+# one minibatch training
+function train!(
+    w, s, batch, optparams; lr=0.0, gclip=0.0, dropouts=Dict(), finetune=false)
+    gloss = lossgradient(
+        w, copy(s), batch[2:end]...; dropouts=dropouts, finetune=finetune)
 
-        # gradient clipping
-        gscale = lr
-        if gclip > 0
-            gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
-            if gnorm > gclip
-                gscale *= gclip / gnorm
-            end
+    # gradient clipping
+    gscale = lr
+    if gclip > 0
+        gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
+        if gnorm > gclip
+            gscale *= gclip / gnorm
         end
-
-        # updateparams
-        for k in 1:length(w)
-            optparams[k].lr = gscale
-            update!(w[k], gloss[k], optparams[k])
-        end
-
-        isa(s,Vector{Any}) || error("State should not be Boxed.")
-        for i = 1:length(s)
-            s[i] = AutoGrad.getval(s[i])
-        end
-        flush(STDOUT)
     end
+
+    # updateparams
+    for k in 1:length(w)
+        optparams[k].lr = gscale
+        update!(w[k], gloss[k], optparams[k])
+    end
+
+    isa(s,Vector{Any}) || error("State should not be Boxed.")
+    for i = 1:length(s)
+        s[i] = AutoGrad.getval(s[i])
+    end
+    flush(STDOUT)
 end
 
 # split testing
