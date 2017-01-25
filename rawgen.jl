@@ -4,9 +4,9 @@ using JLD
 using MAT
 using Images
 
-include("vocab.jl")
-include("convnet.jl")
-include("model.jl")
+include("lib/vocab.jl")
+include("lib/convnet.jl")
+include("lib/model.jl")
 
 function main(args)
     s = ArgParseSettings()

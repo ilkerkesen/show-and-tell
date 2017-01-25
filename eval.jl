@@ -53,6 +53,47 @@ function main(args)
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)
 end
 
+function meteor(translations)
+    precision = 0
+    recall = 0
+    penalty = 0
+    for translation in translations
+
+    end
+end
+
+function meteor(hypothesis, reference)
+    hypwords = get_words(hypothesis)
+    refwords = get_words(reference)
+
+    precision = reduce((acc,x) -> in(x,refwords) + acc, 0, hypwords)
+    recall    = reduce((acc,x) -> in(x,hypwords) + acc, 0, refwords)
+    fscore    = 0
+end
+
+function get_chunk_count(hyp, ref)
+    similiarity(x1,x2) = Int(x1==x2)-1
+    hypwords = get_words(hyp)
+    refwords = get_words(ref)
+
+    # init alignment matrix
+    align = zeros(length(refwords)+1, length(hypwords)+1)
+    for j = 2:size(align,2)
+        align[0,j] = 1-j
+    end
+    for i = 2:size(align,1)
+        align[i,0] = 1-i
+    end
+
+    # calculate alignment matrix
+    for i = 2:size(align,1)
+        for j = 2:size(align,2)
+            p1 = simila
+        end
+    end
+end
+
+
 function bleu(translations)
     N = 4
     hypothesis_length = 0

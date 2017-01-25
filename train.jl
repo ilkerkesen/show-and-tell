@@ -4,11 +4,11 @@ using JLD
 using MAT
 using AutoGrad
 
-include("vocab.jl")
-include("model.jl")
-include("batch.jl")
-include("util.jl")
-include("convnet.jl")
+include("lib/vocab.jl")
+include("lib/model.jl")
+include("lib/batch.jl")
+include("lib/util.jl")
+include("lib/convnet.jl")
 
 function main(args)
     s = ArgParseSettings()

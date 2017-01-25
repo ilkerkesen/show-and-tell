@@ -1,5 +1,5 @@
 using Knet, ArgParse, JLD, MAT
-include("convnet.jl")
+include("lib/convnet.jl")
 SPLITS = ["train", "restval", "val", "test"]
 
 function main(args)

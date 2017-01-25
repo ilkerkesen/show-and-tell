@@ -1,5 +1,5 @@
 using ArgParse, JLD, JSON
-include("vocab.jl");
+include("lib/vocab.jl");
 SPLITS = ["train", "restval", "val", "test"]
 
 
