@@ -47,7 +47,7 @@ function main(args)
         end
 
         entries = get_entries(capfile, splitname)
-        data = []
+        data = Any[]
         partsize = o[:partsize] == 0 ? length(entries) : o[:partsize]
         for i = 1:length(entries)
             entry = entries[i]
@@ -61,6 +61,7 @@ function main(args)
                 img, newsize, rgbmean; crop=crop, randomcrop=randomcrop)
             entry["image"] = img
             push!(data, entry)
+            entries[i] = 0
 
             # feedback
             if o[:feedback] > 0 && i % o[:feedback] == 0
@@ -75,7 +76,7 @@ function main(args)
                 filename = @sprintf(
                     "%s-%s-part-%02d.jld", savefile, splitname, partnumber)
                 save(filename, "data", data)
-                data = []
+                empty!(data)
                 gc()
                 @printf("(%s,%d) saved to %s.\n",
                         splitname, partnumber, filename)
