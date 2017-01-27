@@ -1,48 +1,40 @@
 # generate minibatches
-function make_batches(visuals, captions, vocab, batchsize; finetune=false)
-    catdim = finetune ? 4 : 1
-    nvisuals = length(visuals)
-    if nvisuals != length(captions)
-        error("dimensions mismatch (visuals/captions)")
-    end
-
-    data = []
-    for i = 1:nvisuals
-        filename1, image = visuals[i]
-        filename2, sentences = captions[i]
-        filename1 == filename2 || error("filename mismatch")
-        for sentence in sentences
-            push!(data, (filename1, image, sentence[2]))
+function make_batches(data, vocab, batchsize)
+    samples = []
+    for k = 1:length(data)
+        for s in data[k]["sentences"]
+            push!(samples, (k, s["tokens"]))
         end
     end
-
-    nsamples = length(data)
+    nsamples = length(samples)
     nbatches = div(nsamples, batchsize)
     batches = Any[]
-    shuffle!(data)
+    shuffle!(samples)
 
     # build batches
     for n = 1:nbatches
         lower = (n-1)*batchsize+1
         upper = min(lower+batchsize-1, nsamples)
-        samples = data[lower:upper]
-        vectors = map(s -> s[3], samples)
+        bsamples = samples[lower:upper]
+        ids = map(x->x[1], bsamples)
+        vectors = map(s -> sen2vec(s[2], vocab), bsamples)
         longest = mapreduce(length, max, vectors)
-
-        # batch data
-        bfilenames = map(s -> s[1], samples)
-        bvisuals = mapreduce(s -> s[2], (x...) -> cat(catdim, x...), samples)
-        bcaptions = map(
+        captions = map(
             i -> zeros(Cuchar, upper-lower+1, vocab.size), [1:longest...])
 
         # build captions array for neural network
         for i = 1:upper-lower+1
-            map!(j -> bcaptions[j][i,vectors[i][j]] = 1,
+            map!(j -> captions[j][i,vectors[i][j]] = 1,
                  [1:length(vectors[i])...])
         end
 
-        push!(batches, (bfilenames, bvisuals, bcaptions))
+        push!(batches, (ids, captions))
     end
 
     return batches
+end
+
+# make image batches
+function make_image_batches(data, ids; finetune=false)
+    mapreduce(s->s["image"], (x...)->cat(finetune ? 4 : 1, x...), data[ids])
 end
