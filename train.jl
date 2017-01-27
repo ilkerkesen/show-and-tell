@@ -17,14 +17,23 @@ function main(args)
         " Knet implementation by Ilker Kesen [ikesen16_at_ku.edu.tr], 2016.")
 
     @add_arg_table s begin
-        ("--visual"; help="visual (images|features) data file as JLD")
-        ("--captions"; help="data file contains language data in JLD format")
+        # load/save files
+        ("--traindata"; nargs='+'; help="data files for training")
+        ("--validdata"; nargs='+'; help="data files for validation")
+        ("--vocabfile"; help="file contains vocabulary")
         ("--loadfile"; default=nothing; help="pretrained model file if any")
         ("--savefile"; default=nothing; help="model save file after train")
-        ("--nogpu"; action=:store_true)
+        ("--cnnfile"; help="CNN file")
+
+        # model options
+        ("--winit"; arg_type=Float32; default=Float32(0.01))
         ("--hidden"; arg_type=Int; default=512)
         ("--embed"; arg_type=Int; default=512)
-        ("--winit"; arg_type=Float32; default=Float32(0.01))
+        ("--convnet"; default="vgg19")
+        ("--lastlayer"; default="relu7")
+
+        # training options
+        ("--nogpu"; action=:store_true)
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=256)
         ("--lr"; arg_type=Float32; default=Float32(0.01))
@@ -33,8 +42,7 @@ function main(args)
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--batchshuffle"; action=:store_true; help="shuffle batches")
         ("--finetune"; action=:store_true; help="fine tune convnet")
-        ("--adam"; arg_type=Int; default=0; help="use adam optimizer")
-        ("--adamlr"; arg_type=Float32; default=Float32(0.001))
+        ("--adam"; action=:store_true help="use adam optimizer")
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
@@ -43,108 +51,35 @@ function main(args)
         ("--wembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--membdrop"; arg_type=Float32; default=Float32(0.0))
-        ("--lastlayer"; default="relu7")
-        ("--patience"; arg_type=Int; default=0)
         ("--saveperiod"; arg_type=Int; default=0)
-        ("--improvement"; arg_type=Float32; default=Float32(0.995))
         ("--decayperiod"; arg_type=Int; default=0)
+        ("--newoptimizer"; action=:store_true)
     end
 
     # parse args
     @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+
+    # random seed
     o[:seed] > 0 && srand(o[:seed])
 
-    # set learning rate
-    lr = o[:lr]
-    decay = o[:decay]
+    # TODO: load validation data only once
 
-    # set dropouts
-    dropouts = Dict(
-        "fc6drop" => o[:fc6drop],
-        "fc7drop" => o[:fc7drop],
-        "softdrop" => o[:softdrop],
-        "wembdrop" => o[:wembdrop],
-        "vembdrop" => o[:vembdrop],
-        "membdrop" => o[:membdrop]
-    )
-
-    # load data
-    visdata = load(o[:visual])
-    capdata = load(o[:captions])
-    vocab = capdata["vocab"]
-    extradata = capdata["extradata"]
-
-    if extradata
-        visdata["train"] = vcat(visdata["train"], visdata["restval"])
-        capdata["train"] = vcat(capdata["train"], capdata["restval"])
-    else
-        visdata["val"] = vcat(visdata["val"], visdata["restval"])
-        capdata["val"] = vcat(capdata["val"], capdata["restval"])
-    end
-    delete!(visdata, "restval")
-    delete!(capdata, "restval")
-
-    # generate minibatches
-    trn, t1, m1 = @timed make_batches(
-        visdata["train"], capdata["train"], vocab, o[:batchsize])
-    val, t2, m2 = @timed make_batches(
-        visdata["val"], capdata["val"], vocab, o[:batchsize])
-    @printf("Data loaded. Minibatch operation profiling [%s]\n", now())
-    println("trn => time: ", pretty_time(t1), " mem: ", m1,
-            " length: ", length(trn))
-    println("val => time: ", pretty_time(t2), " mem: ", m2,
-            " length: ", length(val))
-    flush(STDOUT)
-
-    atype = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
-    vocabsize = vocab.size
+    o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     visual = size(trn[1][2],2)
 
     # initialize state and weights
-    bestloss = Inf
-    prevloss = Inf
-    if o[:loadfile] == nothing
-        w = initweights(
-            atype, o[:hidden], visual, vocabsize, o[:embed], o[:winit])
-    else
-        w = load(o[:loadfile], "w")
-        bestloss = load(o[:loadfile], "lossval")
-        prevloss = bestloss
-        save(o[:savefile], "w", w, "lossval", bestloss)
-        w = map(i->convert(atype, i), w)
-    end
-    s = initstate(atype, size(w[3], 1), o[:batchsize])
+    bestloss = !o[:loadfile] ? Inf : load(o[:loadfile], "lossval")
+    prevloss = bestloss
+    w = get_weights(o, visual, vocab.size)
+    s = initstate(o[:atype], size(w[3], 1), o[:batchsize])
+    o[:wdlen] = length(w)
+    wcnn = get_wcnn(o)
+    w = (wcnn == nothing ? w : [wcnn; w])
 
-    # fine tuning
-    woldlen = length(w)
-    if o[:finetune] && o[:cnnfile]
-        wcnn = get_vgg_weights(o[:cnnfile]; last_layer=o[:lastlayer])
-        w = [wcnn; w]
-    elseif o[:finetune] && !o[:cnnfile]
-        wcnn = load(o[:loadfile], "wcnn")
-        wcnn = map(i -> convert(atype, i), wcnn)
-        w = [wcnn; w]
-    end
-
-
-    # parameters for adam optimization
-    wlen = length(w)
-    optparams = Array(Any, wlen)
-    for k = 1:wlen
-        if o[:adam] > 0
-            optparams[k] = Adam(w[k])
-        else
-            optparams[k] = Sgd(;lr=o[:lr])
-        end
-    end
-
-    if o[:adam] > 0
-        lr = o[:adamlr]
-    else
-        lr = o[:lr]
-    end
+    # optimization parameters
+    optparams = get_optparams(o, w)
 
     # gradient check
     if o[:gcheck] > 0
@@ -154,64 +89,31 @@ function main(args)
     # training
     nbatches = length(trn)
     @printf("Training has been started (lossval=%g). [%s]\n", bestloss, now())
-flush(STDOUT)
-saveperiod = o[:saveperiod] != 0 ? o[:saveperiod] : nbatches
-best_iter = 0
-patience = Inf
-if o[:patience] > 0
-    patience = o[:patience]
-end
-for epoch = 1:o[:epochs]
-    t0 = now()
+    flush(STDOUT)
+    o[:saveperiod] = (o[:saveperiod] != 0 ? o[:saveperiod] : nbatches)
+    for epoch = 1:o[:epochs]
+        t0 = now()
 
-    for i = 1:nbatches
-        iter = (epoch-1) * nbatches + i
-        train!(w, s, trn[i], optparams; lr=lr, gclip=o[:gclip], dropouts=dropouts)
+        for i = 1:nbatches
+            iter = (epoch-1) * nbatches + i
+            train!(w, s, trn[i], optparams; o=o)
 
         if iter % saveperiod == 0
             losstrn = o[:fast] ? NaN : test(w, s, trn)
             lossval = test(w, s, val)
             @printf(
                 "\nepoch/iter:%d/%d loss(train/val):%g/%g (lr: %g) [%s]\n",
-                epoch, iter, losstrn, lossval, lr, now())
+                epoch, iter, losstrn, lossval, o[:lr], now())
             flush(STDOUT)
 
             # learning rate decay
-            if !(o[:adam] > 0 && o[:adam] <= epoch) && (lossval > prevloss)
-                @printf("\nlr decay...\n"); flush(STDOUT)
-                lr *= decay
-            end
+            decay!(o, lossval, prevloss)
+            prevloss = lossval
 
             # check best model
-            prevloss = lossval
-            if lossval > bestloss*o[:improvement]
-                if div(iter-best_iter, saveperiod) > patience
-                    @printf("\npatience exceed\n")
-                    flush(STDOUT)
-                    return
-                else
-                    continue
-                end
-            end
+            lossval > bestloss && continue
             bestloss = lossval
-            best_iter = iter
-
-            # save model
-            if o[:savefile] == nothing
-                continue
-            end
-
-            if !o[:finetune]
-                save(o[:savefile],
-                     "wcnn", nothing,
-                     "w", karr2arr(w[end-woldlen+1:end]),
-                     "lossval", bestloss)
-            else
-                save(o[:savefile],
-                     "wcnn", karr2arr(w[1:end-woldlen]),
-                     "w", karr2arr(w[end-woldlen+1:end]),
-                     "lossval", bestloss)
-            end
+            savemodel(w, o, bestloss, optparams)
             @printf("Model saved.\n"); flush(STDOUT)
         end
     end
@@ -224,16 +126,99 @@ for epoch = 1:o[:epochs]
 
     # shuffle batches
     o[:batchshuffle] && shuffle!(trn)
+end
+end
 
-    if epoch == o[:adam]
-        lr = o[:lr]
-        @printf("switching to SGD.\n"); flush(STDOUT)
-        optparams = Array(Any, wlen)
-        for k = 1:wlen
-            optparams[k] = Sgd(;lr=lr)
-        end
+function decay!(o, lossval, prevloss)
+    if !o[:adam] && lossval > prevloss
+        @printf("\nlr decay...\n"); flush(STDOUT)
+        o[:lr] *= o[:decay]
     end
 end
+
+function savemodel(w, o, bestloss, optparams)
+    o[:savefile] == nothing && return
+
+    wcopy = map(x -> convert(Array{Float32}, x), w)
+    wcnn = o[:finetune] ? wcopy[1:end-o[:wdlen]] : nothing
+
+    # optparams
+    optcopy = copy_optparams(optparams, w, o, wdlen)
+    optcnn = o[:finetune] ? optcopy[1:end-o[:wdlen]] : nothing
+
+    save(o[:savefile],
+         "wcnn", wcnn,
+         "w", wcopy[end-o[:wdlen]+1:end],
+         "optcnn", optcnn,
+         "optparams", optcopy[end-o[:wdlen]+1:end]
+         "lossval", bestloss)
 end
+
+function get_weights(o, visual, vocabsize)
+    if o[:loadfile] == nothing
+        w = initweights(
+            o[:atype], o[:hidden], visual, vocabsize, o[:embed], o[:winit])
+    else
+        w = load(o[:loadfile], "w")
+        save(o[:savefile], "w", w, "lossval", bestloss)
+        w = map(i->convert(o[:atype], i), w)
+    end
+    return w
+end
+
+function get_wcnn(o)
+    if o[:finetune] && o[:cnnfile]
+        return get_vgg_weights(o[:cnnfile]; last_layer=o[:lastlayer])
+    elseif o[:finetune] && !o[:cnnfile]
+        return map(i -> convert(o[:atype], i), load(o[:loadfile], "wcnn"))
+    else
+        return nothing
+    end
+end
+
+function get_optparams(o, w)
+    if !o[:loadfile] || o[:newoptimizer]
+        optparams = Array(Any, length(w))
+        for k = 1:length(optparams)
+            optparams[k] = o[:adam] ? Adam(w[k]; lr=o[:lr]) : Sgd(;lr=o[:lr])
+        end
+    elseif o[:loadfile]
+        optcnn = load(o[:loadfile], "optcnn")
+        if o[:finetune] && optcnn == nothing
+            for k = 1:length(w)-o[:wdlen]
+                optcnn[k] = o[:adam] ? Adam(w[k]; lr=o[:lr]) : Sgd(;lr=o[:lr])
+            end
+        end
+        optparams = load(o[:loadfile], "optparams")
+        optparams = o[:finetune] ? [optcnn; optparams] : optparams
+    end
+    return optparams
+end
+
+function copy_optparams(optparams, w, o)
+    length(optparams) == length(w) || error("length mismatch (w/opt)")
+    optcopy = Array(Any, length(optparams))
+    for k = 1:length(optcopy)
+        if typeof(optparams[k]) == Knet.Adam
+            # init parameter
+            optcopy[k] = Adam(zeros(size(w[k])))
+
+            # scalar elements
+            optcopy[k].lr = optparams[k].lr
+            optcopy[k].beta1 = optparams[k].beta1
+            optcopy[k].beta2 = optparams[k].beta2
+            optcopy[k].t = optparams[k].t
+            optcopy[k].eps = optparams[k].eps
+
+            # array elements
+            optcopy[k].fstm = Array(optparams[k].fstm)
+            optcopy[k].scndm = Array(optparams[k].scndm)
+        elseif typeof(optparams[k]) == Knet.Sgd
+            optcopy[k] = Sgd(;lr=optparams[k].lr)
+        end
+    end
+    return optcopy
+end
+
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)
