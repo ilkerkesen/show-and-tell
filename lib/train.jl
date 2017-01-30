@@ -1,13 +1,13 @@
 # one minibatch training
 function train!(w, s, image, captions, optparams, o)
-    gloss = lossgradient(w, copy(s), image, captions, o=o)
+    gloss = lossgradient(w, copy(s), image, captions; o=o)
 
     # gradient clipping
     gscale = o[:lr]
-    if gclip > 0
+    if o[:gclip] > 0
         gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
-        if gnorm > gclip
-            gscale *= gclip / gnorm
+        if gnorm > o[:gclip]
+            gscale *= o[:gclip] / gnorm
         end
     end
 
@@ -33,7 +33,7 @@ function bulkloss(w, s, datafiles, vocab, o)
         for batch in batches
             ids, captions = batch
             images = make_image_batches(data, ids, o[:finetune])
-            total += loss(w, copy(s), images, captions, o)
+            total += loss(w, copy(s), images, captions; o=o)
             count += 1
             flush(STDOUT)
         end

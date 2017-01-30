@@ -1,7 +1,7 @@
 # loss functions
 function loss(w, s, visual, captions; o=Dict())
     finetune = get(o, :finetune, false)
-    if o[:finetune]
+    if finetune
         visual = vgg19(w[1:end-6], KnetArray(visual); o=o)
         visual = transpose(visual)
     else

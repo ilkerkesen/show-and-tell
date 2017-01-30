@@ -17,7 +17,7 @@ function make_batches(data, vocab, batchsize)
         upper = min(lower+batchsize-1, nsamples)
         bsamples = samples[lower:upper]
         ids = map(x->x[1], bsamples)
-        vectors = map(s -> sen2vec(s[2], vocab), bsamples)
+        vectors = map(s -> sen2vec(vocab, s[2]), bsamples)
         longest = mapreduce(length, max, vectors)
         captions = map(
             i -> zeros(Cuchar, upper-lower+1, vocab.size), [1:longest...])

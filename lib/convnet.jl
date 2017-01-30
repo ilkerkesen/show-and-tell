@@ -1,12 +1,3 @@
- # dropout layer
-function dropout(x,d)
-    if d > 0
-        return x .* (rand!(similar(AutoGrad.getval(x))) .> d) * (1/(1-d))
-    else
-        return x
-    end
-end
-
 # VGG16 model for convolutional feature extraction
 function vgg16(w, x; o=Dict())
     # get parameters
