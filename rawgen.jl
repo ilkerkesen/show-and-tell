@@ -61,7 +61,7 @@ function main(args)
     img = load(abspath(o[:image]))
     img = process_image(img, newsize, rgbmean)
     generated = generate(
-        w, wcnn, copy(s), img, vocab, o[:maxlen]; beamsize=o[:beamsize])
+        w, wcnn, copy(s), img, vocab; maxlen=o[:maxlen], beamsize=o[:beamsize])
     report_generation(o[:image], generated, o[:beamsize])
     tf = now()
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)

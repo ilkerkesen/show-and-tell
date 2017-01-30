@@ -1,76 +1,30 @@
- # dropout layer
-function dropout(x,d)
-    if d > 0
-        return x .* (rand!(similar(AutoGrad.getval(x))) .> d) * (1/(1-d))
-    else
-        return x
-    end
-end
-
 # loss functions
-function loss(w, s, visual, captions; dropouts=Dict(), finetune=false)
-    if finetune
-        visual = vgg19(w[1:end-6], KnetArray(visual); dropouts=dropouts)
+function loss(w, s, visual, captions; o=Dict())
+    finetune = get(o, :finetune, false)
+    if o[:finetune]
+        visual = vgg19(w[1:end-6], KnetArray(visual); o=o)
         visual = transpose(visual)
     else
         atype = typeof(AutoGrad.getval(w[1]))
         visual = convert(atype, visual)
     end
 
-    return decoder(w[end-5:end], s, visual, captions; dropouts=dropouts)
+    return decoder(w[end-5:end], s, visual, captions; o=o)
 end
 
 # loss gradient functions
 lossgradient = grad(loss)
 
-# initialize hidden and cell arrays
-function initstate(atype, hidden, batchsize)
-    state = Array(Any, 2)
-    state[1] = zeros(batchsize, hidden)
-    state[2] = zeros(batchsize, hidden)
-    return map(s->convert(atype,s), state)
-end
-
-# initialize all weights of decoder network
-# w[1] & w[2] => weight and bias params for LSTM network
-# w[3] & w[4] => weight and bias params for softmax layer
-# w[5] & w[6] => weights for visual and textual embeddings
-# s[1] & s[2] => hidden state and cell state of LSTM net
-function initweights(atype, hidden, visual, vocab, embed, winit)
-    w = Array(Any, 6)
-    input = embed
-    w[1] = winit*randn(input+hidden, 4*hidden)
-    w[2] = zeros(1, 4*hidden)
-    w[3] = winit*randn(hidden, vocab)
-    w[4] = zeros(1, vocab)
-    w[5] = winit*randn(visual, embed)
-    w[6] = winit*randn(vocab, embed)
-    return map(i->convert(atype, i), w)
-end
-
-# LSTM model - input * weight, concatenated weights
-function lstm(weight, bias, hidden, cell, input)
-    gates   = hcat(input,hidden) * weight .+ bias
-    hsize   = size(hidden,2)
-    forget  = sigm(gates[:,1:hsize])
-    ingate  = sigm(gates[:,1+hsize:2hsize])
-    outgate = sigm(gates[:,1+2hsize:3hsize])
-    change  = tanh(gates[:,1+3hsize:end])
-    cell    = cell .* forget + ingate .* change
-    hidden  = outgate .* tanh(cell)
-    return (hidden,cell)
-end
-
 # loss function for decoder network
-function decoder(w, s, vis, seq; dropouts=Dict())
+function decoder(w, s, vis, seq; o=Dict())
     total, count = 0, 0
     atype = typeof(AutoGrad.getval(w[1]))
 
     # set dropouts
-    vembdrop = get(dropouts, "vembdrop", 0.0)
-    wembdrop = get(dropouts, "wembdrop", 0.0)
-    softdrop = get(dropouts, "softdrop", 0.0)
-    fc7drop  = get(dropouts, "fc7drop", 0.0)
+    vembdrop = get(o, :vembdrop, 0.0)
+    wembdrop = get(o, :wembdrop, 0.0)
+    softdrop = get(o, :softdrop, 0.0)
+    fc7drop  = get(o, :fc7drop, 0.0)
 
     # visual features
     vis = dropout(vis, fc7drop)
@@ -98,49 +52,8 @@ function decoder(w, s, vis, seq; dropouts=Dict())
     return -total / count
 end
 
-# one minibatch training
-function train!(
-    w, s, batch, optparams; lr=0.0, gclip=0.0, dropouts=Dict(), finetune=false)
-    gloss = lossgradient(
-        w, copy(s), batch[2:end]...; dropouts=dropouts, finetune=finetune)
-
-    # gradient clipping
-    gscale = lr
-    if gclip > 0
-        gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
-        if gnorm > gclip
-            gscale *= gclip / gnorm
-        end
-    end
-
-    # updateparams
-    for k in 1:length(w)
-        optparams[k].lr = gscale
-        update!(w[k], gloss[k], optparams[k])
-    end
-
-    isa(s,Vector{Any}) || error("State should not be Boxed.")
-    for i = 1:length(s)
-        s[i] = AutoGrad.getval(s[i])
-    end
-    flush(STDOUT)
-end
-
-# split testing
-function test(w, s, batches; finetune=false)
-    total = 0.0
-    count = 0
-    for batch in batches
-        _, img, cap = batch
-        total += loss(w, copy(s), img, cap; finetune=finetune)
-        count += 1
-        flush(STDOUT)
-    end
-    return total/count
-end
-
 # generate
-function generate(w, wcnn, s, vis, vocab, maxlen; beamsize=1)
+function generate(w, wcnn, s, vis, vocab; maxlen=20, beamsize=1)
     atype = typeof(AutoGrad.getval(w[1]))
     if wcnn != nothing
         vis = KnetArray(vis)

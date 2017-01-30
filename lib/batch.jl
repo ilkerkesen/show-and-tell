@@ -35,6 +35,6 @@ function make_batches(data, vocab, batchsize)
 end
 
 # make image batches
-function make_image_batches(data, ids; finetune=false)
+function make_image_batches(data, ids, finetune)
     mapreduce(s->s["image"], (x...)->cat(finetune ? 4 : 1, x...), data[ids])
 end

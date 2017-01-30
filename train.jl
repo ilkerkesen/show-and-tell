@@ -5,10 +5,13 @@ using MAT
 using AutoGrad
 
 include("lib/vocab.jl")
+include("lib/base.jl")
+include("lib/init.jl")
 include("lib/model.jl")
 include("lib/batch.jl")
-include("lib/util.jl")
 include("lib/convnet.jl")
+include("lib/train.jl")
+include("lib/util.jl")
 
 function main(args)
     s = ArgParseSettings()
@@ -31,6 +34,9 @@ function main(args)
         ("--embed"; arg_type=Int; default=512)
         ("--convnet"; default="vgg19")
         ("--lastlayer"; default="relu7")
+        ("--visual"; arg_type=Int; default=4096)
+        ("--featuremaps"; action=:store_true)
+        ("--cnnmode"; arg_type=Int; default=1)
 
         # training options
         ("--nogpu"; action=:store_true)
@@ -40,20 +46,23 @@ function main(args)
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
-        ("--batchshuffle"; action=:store_true; help="shuffle batches")
         ("--finetune"; action=:store_true; help="fine tune convnet")
         ("--adam"; action=:store_true help="use adam optimizer")
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
         ("--fast"; action=:store_true; help="do not compute train loss")
+        ("--saveperiod"; arg_type=Int; default=0)
+        ("--decayperiod"; arg_type=Int; default=0)
+        ("--newoptimizer"; action=:store_true)
+        ("--evalmetric"; default="bleu")
+        ("--reportloss"; action=:store_true)
+
+        # dropout values
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
         ("--fc7drop"; arg_type=Float32; default=Float32(0.0))
         ("--softdrop"; arg_type=Float32; default=Float32(0.0))
         ("--wembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--membdrop"; arg_type=Float32; default=Float32(0.0))
-        ("--saveperiod"; arg_type=Int; default=0)
-        ("--decayperiod"; arg_type=Int; default=0)
-        ("--newoptimizer"; action=:store_true)
     end
 
     # parse args
@@ -64,86 +73,101 @@ function main(args)
     # random seed
     o[:seed] > 0 && srand(o[:seed])
 
-    # TODO: load validation data only once
-
-    o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
-    visual = size(trn[1][2],2)
+    # load data
+    vocab = load(o[:vocabfile], "vocab")
+    o[:vocabsize] = vocab.size
+    validdata = []
+    for file in o[:validdata]
+        validdata = [validdata; load(o[:validdata], "data")]
+    end
 
     # initialize state and weights
-    bestloss = !o[:loadfile] ? Inf : load(o[:loadfile], "lossval")
-    prevloss = bestloss
-    w = get_weights(o, visual, vocab.size)
+    o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
+    bestscore = !o[:loadfile] ? Inf : load(o[:loadfile], "score")
+    prevscore = bestscore
+    w = get_weights(o)
     s = initstate(o[:atype], size(w[3], 1), o[:batchsize])
     o[:wdlen] = length(w)
     wcnn = get_wcnn(o)
-    w = (wcnn == nothing ? w : [wcnn; w])
-
-    # optimization parameters
+    w = wcnn == nothing ? w : [wcnn; w]
     optparams = get_optparams(o, w)
 
     # gradient check
     if o[:gcheck] > 0
-        gradcheck(loss, w, s, trn[1][2], trn[1][3]; gcheck=o[:gcheck])
+        dummy = make_batches(validdata[1:4*batchsize], vocab, batchsize)[1]
+        dummyimages = make_image_batches(
+            validdata, dummy[1], o[:finetune])
+        dummycaptions = dummy[2]
+        gradcheck(loss, w, s, dummyimages, dummycaptions, o; gcheck=o[:gcheck])
+        dummy = 0; dummyimages = 0; dummycaptions = 0
     end
 
     # training
-    nbatches = length(trn)
     @printf("Training has been started (lossval=%g). [%s]\n", bestloss, now())
     flush(STDOUT)
-    o[:saveperiod] = (o[:saveperiod] != 0 ? o[:saveperiod] : nbatches)
+    iter = 0
     for epoch = 1:o[:epochs]
         t0 = now()
+        trainfiles = shuffle(o[:traindata])
+        for k = 1:length(trainfiles)
+            # make minibatching
+            data = load(trainfiles[k], "data")
+            batches = make_batches(data, vocab, o[:batchsize])
+            nbatches = length(batches)
 
-        for i = 1:nbatches
-            iter = (epoch-1) * nbatches + i
-            train!(w, s, trn[i], optparams; o=o)
+            # data split training
+            for i = 1:nbatches
+                ids, captions = batches[i]
+                images = make_image_batches(data, ids, o[:finetune])
+                train!(w, s, image, captions, optparams, o)
 
-        if iter % saveperiod == 0
-            losstrn = o[:fast] ? NaN : test(w, s, trn)
-            lossval = test(w, s, val)
-            @printf(
-                "\nepoch/iter:%d/%d loss(train/val):%g/%g (lr: %g) [%s]\n",
-                epoch, iter, losstrn, lossval, o[:lr], now())
+                iter += 1
+                if iter % o[:saveperiod] == 0
+                    score, scores, bp, hlen, rlen = validate(w, s, validdata, o)
+                    @printf("\n(epoch/split/iter): %d/%d%d [%s]\n",
+                            epoch, k, iter, now())
+                    @printf("BLEU = %.1f, %.1f/%.1f/%.1f/%.1f ",
+                            100*score, map(i->i*100,scores)...)
+                    @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d)\n",
+                            bp, hlen/rlen, hlen, rlen)
+                    flush(STDOUT)
+
+                    # learning rate decay
+                    decay!(o, score, prevscore)
+                    prevscore = score
+
+                    # check and save best model
+                    score > bestscore || continue
+                    bestscore = score
+                    savemodel(o, w, optparams, bestscore)
+                    @printf("Model saved.\n"); flush(STDOUT)
+                end
+            end
+
+            t1 = now()
+            elapsed = Int64(round(Float64(t1-t0)*0.001))
+            @printf("\nepoch #%d finished. (time elapsed: %s)\n",
+                    epoch, pretty_time(elapsed))
             flush(STDOUT)
-
-            # learning rate decay
-            decay!(o, lossval, prevloss)
-            prevloss = lossval
-
-            # check best model
-            lossval > bestloss && continue
-            bestloss = lossval
-            savemodel(w, o, bestloss, optparams)
-            @printf("Model saved.\n"); flush(STDOUT)
         end
     end
-
-    t1 = now()
-    elapsed = Int64(round(Float64(t1-t0)*0.001))
-    @printf("\nepoch #%d finished. (time elapsed: %s)\n",
-            epoch, pretty_time(elapsed))
-    flush(STDOUT)
-
-    # shuffle batches
-    o[:batchshuffle] && shuffle!(trn)
-end
 end
 
-function decay!(o, lossval, prevloss)
-    if !o[:adam] && lossval > prevloss
+function decay!(o, score, prevscore)
+    if !o[:adam] && score > prevscore
         @printf("\nlr decay...\n"); flush(STDOUT)
         o[:lr] *= o[:decay]
     end
 end
 
-function savemodel(w, o, bestloss, optparams)
+function savemodel(o, w, optparams, bestscore)
     o[:savefile] == nothing && return
 
     wcopy = map(x -> convert(Array{Float32}, x), w)
     wcnn = o[:finetune] ? wcopy[1:end-o[:wdlen]] : nothing
 
     # optparams
-    optcopy = copy_optparams(optparams, w, o, wdlen)
+    optcopy = copy_optparams(optparams, o, w)
     optcnn = o[:finetune] ? optcopy[1:end-o[:wdlen]] : nothing
 
     save(o[:savefile],
@@ -151,16 +175,27 @@ function savemodel(w, o, bestloss, optparams)
          "w", wcopy[end-o[:wdlen]+1:end],
          "optcnn", optcnn,
          "optparams", optcopy[end-o[:wdlen]+1:end]
-         "lossval", bestloss)
+         "bestscore", bestscore)
 end
 
-function get_weights(o, visual, vocabsize)
+function validate(w, s, vocab, data, o; metric=bleu)
+    wcnn = o[:finetune] ? w[1:o[:wdlen]] : nothing
+    wdec = o[:finetune] ? w[end-o[:wdlen]+1:end] : w
+    hyp, ref = [], []
+    for sample in data
+        generation = generate(wdec, wcnn, copy(s), sample["image"], vocab)
+        push!(hyp, generation)
+        push!(ref, map(s->s["raw"], sample["sentences"])
+    end
+    metric(hyp, ref)
+end
+
+function get_weights(o)
     if o[:loadfile] == nothing
-        w = initweights(
-            o[:atype], o[:hidden], visual, vocabsize, o[:embed], o[:winit])
+        w = initweights(o[:atype], o[:hidden], o[:visual],
+                        o[:vocabsize], o[:embed], o[:winit])
     else
         w = load(o[:loadfile], "w")
-        save(o[:savefile], "w", w, "lossval", bestloss)
         w = map(i->convert(o[:atype], i), w)
     end
     return w
@@ -180,13 +215,13 @@ function get_optparams(o, w)
     if !o[:loadfile] || o[:newoptimizer]
         optparams = Array(Any, length(w))
         for k = 1:length(optparams)
-            optparams[k] = o[:adam] ? Adam(w[k]; lr=o[:lr]) : Sgd(;lr=o[:lr])
+            optparams[k] = o[:adam]?Adam(w[k];lr=o[:lr]):Sgd(;lr=o[:lr])
         end
     elseif o[:loadfile]
         optcnn = load(o[:loadfile], "optcnn")
         if o[:finetune] && optcnn == nothing
             for k = 1:length(w)-o[:wdlen]
-                optcnn[k] = o[:adam] ? Adam(w[k]; lr=o[:lr]) : Sgd(;lr=o[:lr])
+                optcnn[k] = o[:adam]?Adam(w[k]; lr=o[:lr]):Sgd(;lr=o[:lr])
             end
         end
         optparams = load(o[:loadfile], "optparams")
@@ -195,7 +230,7 @@ function get_optparams(o, w)
     return optparams
 end
 
-function copy_optparams(optparams, w, o)
+function copy_optparams(optparams, o, w)
     length(optparams) == length(w) || error("length mismatch (w/opt)")
     optcopy = Array(Any, length(optparams))
     for k = 1:length(optcopy)
@@ -219,6 +254,5 @@ function copy_optparams(optparams, w, o)
     end
     return optcopy
 end
-
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

@@ -71,8 +71,8 @@ function main(args)
         filename1 == filename2 || error("filename mismatch")
         visual = visuals[i][2]
         sentences = map(s -> s[1], captions[i][2])
-        generated = generate(
-            w, wcnn, copy(s), visual, vocab, o[:maxlen]; beamsize=o[:beamsize])
+        generated = generate(w, wcnn, copy(s), visual, vocab;
+                             maxlen=o[:maxlen], beamsize=o[:beamsize])
         o[:debug] && report_generation(filename1, generated, sentences)
         push!(filenames, filename1)
         push!(references, sentences)

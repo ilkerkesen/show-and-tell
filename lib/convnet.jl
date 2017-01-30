@@ -8,10 +8,12 @@ function dropout(x,d)
 end
 
 # VGG16 model for convolutional feature extraction
-function vgg16(w, x; dropouts=Dict(), mode=1, featuremaps=false)
-    # get dropouts
-    fc6drop = get(dropouts, "fc6drop", 0.0)
-    fc7drop = get(dropouts, "fc7drop", 0.0)
+function vgg16(w, x; o=Dict())
+    # get parameters
+    fc6drop = get(o, :fc6drop, 0.0)
+    fc7drop = get(o, :fc7drop, 0.0)
+    mode = get(o, :cnnmode, 1)
+    featuremaps = get(o, :featuremaps, false)
 
     conv1_1 = conv4(w[1], x; padding=1, mode=mode) .+ w[2]
     conv1_1 = relu(conv1_1)
@@ -48,23 +50,23 @@ function vgg16(w, x; dropouts=Dict(), mode=1, featuremaps=false)
     conv5_3 = conv4(w[25], conv5_2; padding=1, mode=mode) .+ w[26]
     conv5_3 = relu(conv5_3)
 
-    if featuremaps
-        return conv5_3
+    if !featuremaps
+        pool5 = pool(conv5_3)
+        fc6 = w[27] * mat(pool5) .+ w[28]
+        fc6 = relu(fc6)
+        fc6 = dropout(fc6, fc6drop)
+        fc7 = w[29] * mat(fc6) .+ w[30]
+        fc7 = relu(fc7)
     end
-
-    pool5 = pool(conv5_3)
-    fc6 = w[27] * mat(pool5) .+ w[28]
-    fc6 = relu(fc6)
-    fc6 = dropout(fc6, fc6drop)
-    fc7 = w[29] * mat(fc6) .+ w[30]
-    fc7 = relu(fc7)
 end
 
 # VGG16 model for convolutional feature extraction
-function vgg19(w, x; dropouts=Dict(), mode=1, featuremaps=false)
-    # get dropouts
-    fc6drop = get(dropouts, "fc6drop", 0.0)
-    fc7drop = get(dropouts, "fc7drop", 0.0)
+function vgg19(w, x; o=Dict())
+    # get parameters
+    fc6drop = get(o, :fc6drop, 0.0)
+    fc7drop = get(o, :fc7drop, 0.0)
+    mode = get(o, :cnnmode, 1)
+    featuremaps = get(o, :featuremaps, false)
 
     conv1_1 = conv4(w[1], x; padding=1, mode=mode) .+ w[2]
     conv1_1 = relu(conv1_1)
@@ -107,16 +109,14 @@ function vgg19(w, x; dropouts=Dict(), mode=1, featuremaps=false)
     conv5_4 = conv4(w[31], conv5_3; padding=1, mode=mode) .+ w[32]
     conv5_4 = relu(conv5_4)
 
-    if featuremaps
-        return conv5_4
+    if !featuremaps
+        pool5 = pool(conv5_4)
+        fc6 = w[33] * mat(pool5) .+ w[34]
+        fc6 = relu(fc6)
+        fc6 = dropout(fc6, fc6drop)
+        fc7 = w[35] * mat(fc6) .+ w[36]
+        fc7 = relu(fc7)
     end
-
-    pool5 = pool(conv5_4)
-    fc6 = w[33] * mat(pool5) .+ w[34]
-    fc6 = relu(fc6)
-    fc6 = dropout(fc6, fc6drop)
-    fc7 = w[35] * mat(fc6) .+ w[36]
-    fc7 = relu(fc7)
 end
 
 function get_vgg_weights(vggmat; last_layer="relu7")
