@@ -43,7 +43,7 @@ function main(args)
         ("--nogpu"; action=:store_true)
         ("--epochs"; arg_type=Int; default=1)
         ("--batchsize"; arg_type=Int; default=256)
-        ("--lr"; arg_type=Float32; default=Float32(0.01))
+        ("--lr"; arg_type=Float32; default=Float32(0.001))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
@@ -118,11 +118,13 @@ function main(args)
             data = load(trainfiles[k], "data")
             batches = make_batches(data, vocab, o[:batchsize])
             nbatches = length(batches)
+            data = map(x->x["image"], data); gc()
             @printf("%d minibatches. [%s]\n", nbatches, now())
 
             # data split training
             for i = 1:nbatches
-                ids, captions = batches[i]
+                batch = shift!(batches)
+                ids, captions = batch
                 images = make_image_batches(data, ids, o[:finetune])
                 train!(w, s, images, captions, optparams, o)
 
@@ -153,8 +155,8 @@ function main(args)
             end # batches end
 
             # force garbage collector
-            data = []
-            batches = []
+            empty!(data)
+            empty!(batches)
             gc()
         end # split end
 

@@ -30,13 +30,18 @@ function bulkloss(w, s, datafiles, vocab, o)
     for datafile in datafiles
         data = load(datafile, "data")
         batches = make_batches(data, vocab, o[:batchsize])
-        for batch in batches
+        nbatches = length(batches)
+        for k = 1:nbatches
+            batch = shift!(batches)
             ids, captions = batch
             images = make_image_batches(data, ids, o[:finetune])
             total += loss(w, copy(s), images, captions; o=o)
             count += 1
             flush(STDOUT)
         end
+        empty!(data)
+        empty!(nbatches)
+        gc()
     end
     return total/count
 end
