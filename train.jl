@@ -1,7 +1,9 @@
 using Knet
 using ArgParse
 using JLD
+using HDF5
 using MAT
+using JSON
 using AutoGrad
 
 include("lib/vocab.jl")
@@ -13,6 +15,7 @@ include("lib/convnet.jl")
 include("lib/train.jl")
 include("lib/eval.jl")
 include("lib/util.jl")
+include("lib/data.jl")
 
 function main(args)
     s = ArgParseSettings()
@@ -22,12 +25,13 @@ function main(args)
 
     @add_arg_table s begin
         # load/save files
-        ("--traindata"; nargs='+'; help="data files for training")
-        ("--validdata"; nargs='+'; help="data files for validation")
-        ("--vocabfile"; help="file contains vocabulary")
+        ("--images"; help="images JLD file")
+        ("--captions"; help="captions zip file (shared by Karpathy)")
+        ("--vocabfile"; help="vocabulary JLD file")
         ("--loadfile"; default=nothing; help="pretrained model file if any")
         ("--savefile"; default=nothing; help="model save file after train")
-        ("--cnnfile"; help="CNN file")
+        ("--cnnfile"; help="pre-trained CNN MAT file")
+        ("--extradata"; action=:store_true; help="use restval split for training")
 
         # model options
         ("--winit"; arg_type=Float32; default=Float32(0.01))
@@ -56,6 +60,8 @@ function main(args)
         ("--newoptimizer"; action=:store_true)
         ("--evalmetric"; default="bleu")
         ("--reportloss"; action=:store_true)
+        ("--beamsize"; arg_type=Int; default=1)
+        ("--skipval"; arg_type=Int; default=0; help="skip validation for N epochs")
 
         # dropout values
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
@@ -74,98 +80,100 @@ function main(args)
     # random seed
     o[:seed] > 0 && srand(o[:seed])
 
-    # load data
+    # load vocabulary
     vocab = load(o[:vocabfile], "vocab")
     o[:vocabsize] = vocab.size
-    validdata = []
-    for file in o[:validdata]
-        validdata = [validdata; load(file, "data")]
-    end
 
     # initialize state and weights
     o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     bestscore = o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
     prevscore = bestscore
     w = get_weights(o)
-    s = initstate(o[:atype], size(w[3], 1), o[:batchsize])
+    s = initstate(o[:atype], size(w[end-3], 1), o[:batchsize])
     o[:wdlen] = length(w)
     wcnn = get_wcnn(o)
     w = wcnn == nothing ? w : [wcnn; w]
     optparams = get_optparams(o, w)
 
+    # get samples used during training process
+    train, restval, val = get_entries(o[:captions], ["train", "restval", "val"])
+    if o[:extradata]
+        train = [train; restval]
+    else
+        val = [val; restval]
+    end
+    restval = 0
+
+    # split samples into image/sentence pairs
+    train = get_pairs(train)
+    valid = o[:reportloss] ? get_pairs(val) : [] # keep val for validation
+    gc()
+    const nsamples = length(train)
+    const nbatches = div(nsamples, o[:batchsize])
+    const saveperiod = o[:saveperiod] > 0 ? o[:saveperiod] : nbatches
+
     # gradient check
     if o[:gcheck] > 0
-        dummy = make_batches(
-            validdata[1:o[:batchsize]], vocab, o[:batchsize])[1]
-        dummyimages = make_image_batches(
-            validdata, dummy[1], o[:finetune])
-        dummycaptions = dummy[2]
-        gradcheck(loss, w, s, dummyimages, dummycaptions; gcheck=o[:gcheck])
-        dummy = 0; dummyimages = 0; dummycaptions = 0; gc()
+        ids = shuffle([1:nsamples...])[1:o[:batchsize]]
+        images, captions = make_batch(o, train[ids], vocab)
+        gradcheck(loss, w, copy(s), images, captions; gcheck=o[:gcheck])
+        images
+        gc()
     end
 
     # training
-    @printf("Training has been started (score=%g). [%s]\n", bestscore, now())
+    ids = [1:nsamples...]
+    @printf("Training has been started (nbatches=%d, score=%g). [%s]\n",
+            nbatches, bestscore, now())
     flush(STDOUT)
-    iter = 0
     for epoch = 1:o[:epochs]
         t0 = now()
+        shuffle!(ids)
 
-        trainfiles = shuffle(o[:traindata])
-        for k = 1:length(trainfiles)
-            # make minibatching
-            @printf("\nsplit: %s [%s]\n", trainfiles[k], now())
-            data = load(trainfiles[k], "data")
-            batches = make_batches(data, vocab, o[:batchsize])
-            nbatches = length(batches)
-            data = map(x->x["image"], data); gc()
-            @printf("%d minibatches. [%s]\n", nbatches, now())
+        # data split training
+        for i = 1:nbatches
+            iter = (epoch-1)*nbatches+i
+            lower = (i-1)*o[:batchsize]+1
+            upper = min(lower+o[:batchsize]-1, nsamples)
+            samples = train[ids[lower:upper]]
+            images, captions = make_batch(o, samples, vocab)
+            train!(w, s, images, captions, optparams, o)
+            flush(STDOUT)
+            images = 0; captions = 0; ans = 0; gc()
 
-            # data split training
-            for i = 1:nbatches
-                batch = shift!(batches)
-                ids, captions = batch
-                images = make_image_batches(data, ids, o[:finetune])
-                train!(w, s, images, captions, optparams, o)
+            if epoch > o[:skipval] && iter % saveperiod == 0
+                @printf("\n(epoch/iter): %d/%d [%s] ",
+                        epoch, iter, now())
+                flush(STDOUT)
+                score, scores, bp, hlen, rlen =
+                    validate(w, val, vocab, o)
+                @printf("\nBLEU = %.1f, %.1f/%.1f/%.1f/%.1f ",
+                        100*score, map(i->i*100,scores)...)
+                @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d) [%s]\n",
+                        bp, hlen/rlen, hlen, rlen, now())
+                flush(STDOUT)
 
-                iter += 1
-                if (o[:saveperiod] > 0 && iter % o[:saveperiod] == 0) ||
-                    (o[:saveperiod] == 0 && i == nbatches)
-                    @printf("\n(epoch/split/iter): %d/%d/%d [%s] ",
-                            epoch, k, iter, now())
-                    flush(STDOUT)
-                    score, scores, bp, hlen, rlen =
-                        validate(w, vocab, validdata, o)
-                    @printf("\nBLEU = %.1f, %.1f/%.1f/%.1f/%.1f ",
-                            100*score, map(i->i*100,scores)...)
-                    @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d) [%s]\n",
-                            bp, hlen/rlen, hlen, rlen, now())
-                    flush(STDOUT)
+                # learning rate decay
+                decay!(o, score, prevscore)
+                prevscore = score
+                gc()
 
-                    # learning rate decay
-                    decay!(o, score, prevscore)
-                    prevscore = score
-
-                    # check and save best model
-                    score > bestscore || continue
-                    bestscore = score
-                    savemodel(o, w, optparams, bestscore)
-                    @printf("Model saved.\n"); flush(STDOUT)
-                end
-            end # batches end
-
-            # force garbage collector
-            empty!(data)
-            empty!(batches)
-            gc()
-        end # split end
+                # check and save best model
+                score >= bestscore || continue
+                bestscore = score
+                savemodel(o, w, optparams, bestscore)
+                @printf("Model saved.\n"); flush(STDOUT)
+            end
+        end # batches end
 
         if o[:reportloss]
-            losstrn = bulkloss(w, s, o[:traindata], vocab, o)
-            lossval = bulkloss(w, s, o[:validdata], vocab, o)
+            @printf("\nepoch: %d, loss report [%s]", epoch, now())
+            losstrn = bulkloss(w, s, o, train, vocab)
+            lossval = bulkloss(w, s, o, valid, vocab)
             @printf(
                 "\nepoch:%d loss(train/val):%g/%g [%s]\n",
                 epoch, losstrn, lossval, now())
+            gc()
         end
 
         t1 = now()
@@ -173,6 +181,7 @@ function main(args)
         @printf("\nepoch #%d finished. (time elapsed: %s)\n",
                 epoch, pretty_time(elapsed))
         flush(STDOUT)
+        gc()
     end # epoch end
 end
 
@@ -201,17 +210,25 @@ function savemodel(o, w, optparams, bestscore)
          "bestscore", bestscore)
 end
 
-function validate(w, vocab, data, o; metric=bleu)
+function validate(w, data, vocab, o; metric=bleu, split="val")
     wcnn = o[:finetune] ? w[1:o[:wdlen]] : nothing
     wdec = o[:finetune] ? w[end-o[:wdlen]+1:end] : w
     hyp, ref = [], []
-    s = initstate(o[:atype], size(w[3], 1), 1)
-    for sample in data
-        generation = generate(wdec, wcnn, copy(s), sample["image"], vocab)
-        push!(hyp, generation)
-        push!(ref, map(s->s["raw"], sample["sentences"]))
+    s = initstate(o[:atype], size(w[end-3], 1), 1)
+
+    hyp, ref = h5open(o[:images], "r") do f
+        hyp, ref = [], []
+        for entry in data
+            image = read(f, entry["filename"])
+            caption = generate(
+                wdec, wcnn, copy(s), image, vocab; beamsize=o[:beamsize])
+            push!(hyp, caption)
+            push!(ref, map(s->s["raw"], entry["sentences"]))
+        end
+        hyp, ref
     end
-    metric(hyp, ref)
+
+    return metric(hyp, ref)
 end
 
 function get_weights(o)

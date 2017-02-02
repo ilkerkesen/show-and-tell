@@ -24,24 +24,21 @@ function train!(w, s, image, captions, optparams, o)
 end
 
 # for testing
-function bulkloss(w, s, datafiles, vocab, o)
+function bulkloss(w, s, o, data, vocab)
+    nsamples = length(data)
+    ids = [1:nsamples...]
+    nbatches = div(nsamples, o[:batchsize])
+
     total = 0.0
     count = 0
-    for datafile in datafiles
-        data = load(datafile, "data")
-        batches = make_batches(data, vocab, o[:batchsize])
-        nbatches = length(batches)
-        for k = 1:nbatches
-            batch = shift!(batches)
-            ids, captions = batch
-            images = make_image_batches(data, ids, o[:finetune])
-            total += loss(w, copy(s), images, captions; o=o)
-            count += 1
-            flush(STDOUT)
-        end
-        empty!(data)
-        empty!(nbatches)
-        gc()
+    for i = 1:nbatches
+        lower = (i-1)*o[:batchsize]+1
+        upper = min(lower+o[:batchsize]-1, nsamples)
+        samples = data[ids[lower:upper]]
+        images, captions = make_batch(o, samples, vocab)
+        total += loss(w, copy(s), images, captions; o=o)
+        count += 1
+        images, captions = 0, 0; gc(); flush(STDOUT)
     end
     return total/count
 end

@@ -5,7 +5,7 @@ SPLITS = ["train", "restval", "val", "test"]
 
 function main(args)
     s = ArgParseSettings()
-    s.description = "Convert common image captioning datasets to JLD format."
+    s.description = "Build vocabulary from training splits"
 
     @add_arg_table s begin
         ("--captions"; required=true;

@@ -1,40 +1,25 @@
-# generate minibatches
-function make_batches(data, vocab, batchsize)
-    samples = []
-    for k = 1:length(data)
-        for s in data[k]["sentences"]
-            push!(samples, (k, s["tokens"]))
-        end
-    end
-    nsamples = length(samples)
-    nbatches = div(nsamples, batchsize)
-    batches = Any[]
-    shuffle!(samples)
-
-    # build batches
-    for n = 1:nbatches
-        lower = (n-1)*batchsize+1
-        upper = min(lower+batchsize-1, nsamples)
-        bsamples = samples[lower:upper]
-        ids = map(x->x[1], bsamples)
-        vectors = map(s -> sen2vec(vocab, s[2]), bsamples)
-        longest = mapreduce(length, max, vectors)
-        captions = map(
-            i -> zeros(Cuchar, upper-lower+1, vocab.size), [1:longest...])
-
-        # build captions array for neural network
-        for i = 1:upper-lower+1
-            map!(j -> captions[j][i,vectors[i][j]] = 1,
-                 [1:length(vectors[i])...])
-        end
-
-        push!(batches, (ids, captions))
-    end
-
-    return batches
+function make_batch(o, samples, vocab)
+    make_images_batch(o, map(s->s[1], samples)),
+    make_captions_batch(o, map(s->s[2], samples), vocab)
 end
 
-# make image batches
-function make_image_batches(data, ids, finetune)
-    mapreduce(s->s["image"], (x...)->cat(finetune ? 4 : 1, x...), data[ids])
+function make_images_batch(o, filenames)
+    images = h5open(o[:images], "r") do f
+        reduce(
+            (x...)->cat(o[:finetune]?4:1, x...),
+            map(x->read(f,x), filenames))
+    end
+    return images
+end
+
+function make_captions_batch(o, tokens, vocab)
+    # captions batch
+    vectors = map(t->sen2vec(vocab, t), tokens)
+    longest = mapreduce(length, max, vectors)
+    captions = map(i->zeros(Cuchar, length(tokens), vocab.size), [1:longest...])
+    for i = 1:length(tokens)
+        map!(j -> captions[j][i,vectors[i][j]] = 1,
+             [1:length(vectors[i])...])
+    end
+    return captions
 end
