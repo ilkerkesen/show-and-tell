@@ -1,5 +1,11 @@
-using ArgParse, JLD, Images, JSON
+using Images
+using JSON
+using ArgParse
+using HDF5
+
 SPLITS = ["train", "restval", "val", "test"]
+
+include("lib/data.jl")
 
 function main(args)
     s = ArgParseSettings()
@@ -9,7 +15,7 @@ function main(args)
         ("--images"; required=true; help="images dir")
         ("--captions"; required=true;
          help="captions archive file path (karpathy)")
-        ("--savefile"; required=true; help="output file in JLD format")
+        ("--savefile"; required=true; help="output file in HDF5 format")
         ("--imsize"; arg_type=Int; nargs=2; default=[224,224];
          help="new image sizes")
         ("--rgbmean"; arg_type=Float32; nargs=3;
@@ -21,7 +27,6 @@ function main(args)
         ("--nocrop"; action=:store_true)
         ("--randomcrop"; action=:store_true)
         ("--extradata"; action=:store_true)
-        ("--partsize"; arg_type=Int; default=0)
     end
 
     isa(args, AbstractString) && (args=split(args))
@@ -48,7 +53,6 @@ function main(args)
 
         entries = get_entries(capfile, splitname)
         data = Any[]
-        partsize = o[:partsize] == 0 ? length(entries) : o[:partsize]
         for i = 1:length(entries)
             entry = entries[i]
             if o[:debug]
@@ -89,13 +93,6 @@ function read_image(file, imgpath)
     target = joinpath(imgpath, file)
     img = load(target)
     return img
-end
-
-function get_entries(zip, split)
-    zip = abspath(zip)
-    file = joinpath(splitext(splitdir(abspath(zip))[2])[1], "dataset.json")
-    images = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
-    return filter(i -> i["split"] == split, images)
 end
 
 function process_image(img, newsize, rgbmean; crop=true, randomcrop=false)

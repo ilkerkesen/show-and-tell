@@ -1,32 +1,38 @@
 using Knet
 using ArgParse
 using JLD
+using HDF5
+using JSON
 
 include("lib/vocab.jl")
+include("lib/base.jl")
 include("lib/convnet.jl")
+include("lib/init.jl")
 include("lib/model.jl")
+include("lib/data.jl")
 
 function main(args)
     s = ArgParseSettings()
     s.description = "Caption generation script for the model."
 
     @add_arg_table s begin
-        ("--visual"; help="data file contains vocabulary")
-        ("--captions"; help="data file contains vocabulary")
+        ("--images"; help="data file contains images/features")
+        ("--captions"; help="zip file contains caption data (karpathy)")
         ("--modelfile"; help="trained model file")
+        ("--vocabfile"; help="vocabulary file")
         ("--cnnfile"; help="convnet file for non-finetuned model")
-        ("--savedir"; help="save generations and references")
+        ("--savefile"; help="save generations in JSON format")
         ("--beamsize"; arg_type=Int; default=1)
         ("--datasplit"; default="test"; help="data split is going to be used")
-        ("--maxlen"; arg_type=Int; default=20; help="max sentence length")
+        ("--extradata"; action=:store_true)
+        ("--maxlen"; arg_type=Int; default=25; help="max sentence length")
         ("--nogpu"; action=:store_true)
         ("--testing"; action=:store_true)
         ("--shuffle"; action=:store_true)
-        ("--debug"; action=:store_true)
         ("--amount"; arg_type=Int; default=20;
          help="generation amount in case of testing")
-        ("--noreferences"; action=:store_true;
-         help="this is for non-dataset images")
+        ("--feedback"; arg_type=Int; default=100;
+         help="feedback in every N generation")
     end
 
     # parse args
@@ -34,25 +40,18 @@ function main(args)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
-    # checkdir
-    if !isdir(o[:savedir])
-        println("savedir does not exist.")
-        flush(STDOUT)
-        quit()
-    end
-    savedir = abspath(o[:savedir])
+    savefile = abspath(o[:savefile])
 
     # load data
-    visuals = load(o[:visual], o[:datasplit])
-    captions = load(o[:captions], o[:datasplit])
-    vocab = load(o[:captions], "vocab")
+    vocab = load(o[:vocabfile], "vocab")
+    entries = get_entries(o[:captions], [o[:datasplit]])[1]
     @printf("Data loaded [%s]\n", now()); flush(STDOUT)
 
     # load weights
     atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
     w = load(o[:modelfile], "w")
     w = map(i->convert(atype, i), w)
-    lossval = load(o[:modelfile], "lossval")
+    score = load(o[:modelfile], "bestscore")
     s = initstate(atype, size(w[3], 1), 1)
 
     wcnn = load(o[:modelfile], "wcnn")
@@ -60,64 +59,50 @@ function main(args)
         wcnn = map(i->convert(atype, i), wcnn)
     end
 
+    @printf("Model loaded [%s]\n", now()); flush(STDOUT)
+
     # generate captions
-    counter, ti = 0, now()
-    filenames, references, generations = [], [], []
-    @printf("Generation started (loss=%g,date=%s)\n", lossval, now())
+    ti = now()
+    captions = []
+    @printf("Generation started (score=%g,date=%s)\n", score, now())
     flush(STDOUT)
-    for i = 1:length(visuals)
+    for i = 1:length(entries)
         o[:testing] && counter >= o[:amount] && break
-        filename1, filename2 = visuals[i][1], captions[i][1]
-        filename1 == filename2 || error("filename mismatch")
-        visual = visuals[i][2]
-        sentences = map(s -> s[1], captions[i][2])
-        generated = generate(w, wcnn, copy(s), visual, vocab;
-                             maxlen=o[:maxlen], beamsize=o[:beamsize])
-        o[:debug] && report_generation(filename1, generated, sentences)
-        push!(filenames, filename1)
-        push!(references, sentences)
-        push!(generations, generated)
-        counter += 1
+
+        entry = entries[i]
+        filename = entry["filename"]
+        image = h5open(o[:images], "r") do f
+            read(f, filename)
+        end
+        caption = generate(w, wcnn, copy(s), image, vocab;
+                           maxlen=o[:maxlen], beamsize=o[:beamsize])
+        references = map(s->s["raw"], entry["sentences"])
+        new_entry = Dict(
+            "filename" => filename,
+            "hypothesis" => caption,
+            "references" => references)
+        push!(captions, new_entry)
+
+        if o[:feedback] > 0 && i % o[:feedback] == 0
+            @printf("\n%d captions generated so far [%s]\n", i, now())
+            flush(STDOUT)
+        end
     end
 
-    if !o[:testing]
-        write_generations(savedir, filenames, generations, references)
+    meta = Dict(
+        "model" => o[:modelfile],
+        "data" => o[:images],
+        "split" => o[:datasplit],
+        "score" => score,
+        "beamsize" => o[:beamsize],
+        "date" => now())
+
+    open(savefile, "w") do f
+        write(f, json(Dict("meta"=>meta,"captions"=>captions)))
     end
 
     tf = now()
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)
-end
-
-function report_generation(filename, generated, references)
-    @printf("\nFilename: %s\n", filename)
-    @printf("Generated: %s\n", generated)
-    for i = 1:length(references)
-        @printf("Reference #%d: %s\n", i, references[i])
-    end
-    flush(STDOUT)
-end
-
-function write_generations(savedir, filenames, generations, references)
-    numrefs = length(references[1])
-    files = []
-    for i = 1:numrefs
-        file = open(joinpath(savedir, "references$(i).txt"), "w")
-        push!(files, file)
-    end
-    filenamesfile = open(joinpath(savedir, "filenames.txt"), "w")
-    generationsfile = open(joinpath(savedir, "generations.txt"), "w")
-    for i = 1:length(filenames)
-        write(filenamesfile, string(filenames[i], "\n"))
-        write(generationsfile, string(generations[i], "\n"))
-        for j = 1:numrefs
-            write(files[j], string(references[i][j], "\n"))
-        end
-    end
-    for i = 1:numrefs
-        close(files[i])
-    end
-    close(filenamesfile)
-    close(generationsfile)
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

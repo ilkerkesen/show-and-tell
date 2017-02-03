@@ -31,7 +31,8 @@ function main(args)
         ("--loadfile"; default=nothing; help="pretrained model file if any")
         ("--savefile"; default=nothing; help="model save file after train")
         ("--cnnfile"; help="pre-trained CNN MAT file")
-        ("--extradata"; action=:store_true; help="use restval split for training")
+        ("--extradata"; action=:store_true;
+         help="use restval split for training")
 
         # model options
         ("--winit"; arg_type=Float32; default=Float32(0.01))
@@ -56,12 +57,12 @@ function main(args)
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--saveperiod"; arg_type=Int; default=0)
-        ("--decayperiod"; arg_type=Int; default=0)
         ("--newoptimizer"; action=:store_true)
         ("--evalmetric"; default="bleu")
         ("--reportloss"; action=:store_true)
         ("--beamsize"; arg_type=Int; default=1)
-        ("--skipval"; arg_type=Int; default=0; help="skip validation for N epochs")
+        ("--skipval"; arg_type=Int; default=0;
+         help="skip validation for N epochs")
 
         # dropout values
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
