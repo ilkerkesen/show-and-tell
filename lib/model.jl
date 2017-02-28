@@ -16,7 +16,7 @@ end
 lossgradient = grad(loss)
 
 # loss function for decoder network
-function decoder(w, s, vis, seq; o=Dict())
+function decoder(w, s, vis, seq; o=Dict(), values=[])
     total, count = 0, 0
     atype = typeof(AutoGrad.getval(w[1]))
 
@@ -45,11 +45,13 @@ function decoder(w, s, vis, seq; o=Dict())
         ypred = logp(ht * w[3] .+ w[4], 2)
         ygold = convert(atype, seq[i+1])
         total += sum(ygold .* ypred)
-        count += size(ygold, 1)
+        count += sum(ygold)
         x = ygold
     end
 
-    return -total / count
+    lossval = -total/count
+    push!(values, AutoGrad.getval(lossval))
+    return lossval
 end
 
 # generate

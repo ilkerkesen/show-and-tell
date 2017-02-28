@@ -1,6 +1,7 @@
 # one minibatch training
 function train!(w, s, image, captions, optparams, o)
-    gloss = lossgradient(w, copy(s), image, captions; o=o)
+    values = []
+    gloss = lossgradient(w, copy(s), image, captions; o=o, values=values)
 
     # gradient clipping
     gscale = o[:lr]
@@ -21,6 +22,8 @@ function train!(w, s, image, captions, optparams, o)
     for i = 1:length(s)
         s[i] = AutoGrad.getval(s[i])
     end
+
+    return values[1]
 end
 
 # for testing
