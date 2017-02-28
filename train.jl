@@ -59,10 +59,8 @@ function main(args)
         ("--saveperiod"; arg_type=Int; default=0)
         ("--newoptimizer"; action=:store_true)
         ("--evalmetric"; default="bleu")
-        ("--reportloss"; action=:store_true)
         ("--beamsize"; arg_type=Int; default=1)
-        ("--skipval"; arg_type=Int; default=0;
-         help="skip validation for N epochs")
+        ("--checkpoints"; arg_type=Int; default=1)
 
         # dropout values
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
@@ -87,8 +85,8 @@ function main(args)
 
     # initialize state and weights
     o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
-    bestscore = o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
-    prevscore = bestscore
+    prevscore = bestscore = o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
+    prevloss  = bestloss  = o[:loadfile] == nothing ? Inf : load(o[:loadfile], "lossval")
     w = get_weights(o)
     s = initstate(o[:atype], size(w[end-3], 1), o[:batchsize])
     o[:wdlen] = length(w)
@@ -107,7 +105,7 @@ function main(args)
 
     # split samples into image/sentence pairs
     train = get_pairs(train)
-    valid = o[:reportloss] ? get_pairs(val) : [] # keep val for validation
+    valid = get_pairs(val) # keep val for validation
     gc()
     const nsamples = length(train)
     const nbatches = div(nsamples, o[:batchsize])
@@ -122,6 +120,9 @@ function main(args)
         gc()
     end
 
+    # checkpoints
+    checkpoints = []
+
     # training
     ids = [1:nsamples...]
     @printf("Training has been started (nbatches=%d, score=%g). [%s]\n",
@@ -132,19 +133,22 @@ function main(args)
         shuffle!(ids)
 
         # data split training
+        losstrn = 0
         for i = 1:nbatches
             iter = (epoch-1)*nbatches+i
             lower = (i-1)*o[:batchsize]+1
             upper = min(lower+o[:batchsize]-1, nsamples)
             samples = train[ids[lower:upper]]
             images, captions = make_batch(o, samples, vocab)
-            train!(w, s, images, captions, optparams, o)
+            batchloss = train!(w, s, images, captions, optparams, o)
             flush(STDOUT)
             images = 0; captions = 0; ans = 0; gc()
+            losstrn += batchloss
 
-            if epoch > o[:skipval] && iter % saveperiod == 0
-                @printf("\n(epoch/iter): %d/%d [%s] ",
-                        epoch, iter, now())
+            if iter % saveperiod == 0
+                lossval = bulkloss(w,s,o,valid,vocab)
+                @printf("\n(epoch/iter): %d/%d, loss: %g/%g [%s] ",
+                        epoch, iter, losstrn, lossval, now())
                 flush(STDOUT)
                 score, scores, bp, hlen, rlen =
                     validate(w, val, vocab, o)
@@ -154,28 +158,31 @@ function main(args)
                         bp, hlen/rlen, hlen, rlen, now())
                 flush(STDOUT)
 
+
                 # learning rate decay
-                decay!(o, score, prevscore)
+                decay!(o, lossval, prevloss)
                 prevscore = score
+                prevloss  = lossval
                 gc()
 
                 # check and save best model
-                score >= bestscore || continue
-                bestscore = score
-                savemodel(o, w, optparams, bestscore)
-                @printf("Model saved.\n"); flush(STDOUT)
+                score >= bestscore || lossval <= bestloss || continue
+
+                # update score and loss values
+                bestscore = score >= bestscore ? score : bestscore
+                bestloss = lossval <= bestloss ? lossval : bestloss
+
+                path, ext = splitext(abspath(o[:savefile]))
+                filename  = abspath(string(path, "iter-", iter, ext))
+                savemodel(o, w, optparams, filename, score, lossval)
+                @printf("Model saved to %s.\n", filename); flush(STDOUT)
+                push!(checkpoints, filename)
+                if length(checkpoints) > o[:checkpoints]
+                    oldest = shift!(checkpoints)
+                    rm(oldest)
+                end
             end
         end # batches end
-
-        if o[:reportloss]
-            @printf("\nepoch: %d, loss report [%s]", epoch, now())
-            losstrn = bulkloss(w, s, o, train, vocab)
-            lossval = bulkloss(w, s, o, valid, vocab)
-            @printf(
-                "\nepoch:%d loss(train/val):%g/%g [%s]\n",
-                epoch, losstrn, lossval, now())
-            gc()
-        end
 
         t1 = now()
         elapsed = Int64(round(Float64(t1-t0)*0.001))
@@ -186,14 +193,14 @@ function main(args)
     end # epoch end
 end
 
-function decay!(o, score, prevscore)
-    if !o[:adam] && score > prevscore
+function decay!(o, lossval, prevloss)
+    if !o[:adam] && lossval > prevloss
         @printf("\nlr decay...\n"); flush(STDOUT)
         o[:lr] *= o[:decay]
     end
 end
 
-function savemodel(o, w, optparams, bestscore)
+function savemodel(o, w, optparams, filename, score, lossval)
     o[:savefile] == nothing && return
 
     wcopy = map(x -> convert(Array{Float32}, x), w)
@@ -203,12 +210,13 @@ function savemodel(o, w, optparams, bestscore)
     optcopy = copy_optparams(optparams, o, w)
     optcnn = o[:finetune] ? optcopy[1:end-o[:wdlen]] : nothing
 
-    save(o[:savefile],
+    save(filename,
          "wcnn", wcnn,
          "w", wcopy[end-o[:wdlen]+1:end],
          "optcnn", optcnn,
          "optparams", optcopy[end-o[:wdlen]+1:end],
-         "bestscore", bestscore)
+         "score", score,
+         "lossval", lossval)
 end
 
 function validate(w, data, vocab, o; metric=bleu, split="val")
