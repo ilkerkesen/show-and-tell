@@ -16,6 +16,7 @@ function initweights(atype, hidden, visual, vocab, embed, winit)
     input = embed
     w[1] = winit*randn(input+hidden, 4*hidden)
     w[2] = zeros(1, 4*hidden)
+    w[2][1:hidden] = 1 # forget gate bias
     w[3] = winit*randn(hidden, vocab)
     w[4] = zeros(1, vocab)
     w[5] = winit*randn(visual, embed)
