@@ -16,7 +16,7 @@ function make_captions_batch(o, tokens, vocab)
     # captions batch
     vectors = map(t->sen2vec(vocab, t), tokens)
     longest = mapreduce(length, max, vectors)
-    captions = map(i->zeros(Cuchar, length(tokens), vocab.size), [1:longest...])
+    captions = map(i->falses(length(tokens), vocab.size), [1:longest...])
     for i = 1:length(tokens)
         map!(j -> captions[j][i,vectors[i][j]] = 1,
              [1:length(vectors[i])...])
