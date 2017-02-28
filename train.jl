@@ -257,7 +257,7 @@ function get_optparams(o, w)
     if o[:loadfile] == nothing || o[:newoptimizer]
         optparams = Array(Any, length(w))
         for k = 1:length(optparams)
-            optparams[k] = o[:adam]?Adam(w[k];lr=o[:lr]):Sgd(;lr=o[:lr])
+            optparams[k] = o[:adam]?Adam(;lr=o[:lr]):Sgd(;lr=o[:lr])
         end
     elseif o[:loadfile] != nothing
         optcnn = load(o[:loadfile], "optcnn")
