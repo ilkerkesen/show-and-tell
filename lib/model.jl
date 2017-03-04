@@ -1,5 +1,5 @@
 # loss functions
-function loss(w, s, visual, captions; o=Dict())
+function loss(w, s, visual, captions; o=Dict(), values=[])
     finetune = get(o, :finetune, false)
     if finetune
         visual = vgg19(w[1:end-6], KnetArray(visual); o=o)
@@ -9,14 +9,16 @@ function loss(w, s, visual, captions; o=Dict())
         visual = convert(atype, visual)
     end
 
-    return decoder(w[end-5:end], s, visual, captions; o=o)
+    lossval = decoder(w[end-5:end], s, visual, captions; o=o)
+    push!(values, AutoGrad.getval(lossval))
+    return lossval
 end
 
 # loss gradient functions
 lossgradient = grad(loss)
 
 # loss function for decoder network
-function decoder(w, s, vis, seq; o=Dict(), values=[])
+function decoder(w, s, vis, seq; o=Dict())
     total, count = 0, 0
     atype = typeof(AutoGrad.getval(w[1]))
 
@@ -46,12 +48,10 @@ function decoder(w, s, vis, seq; o=Dict(), values=[])
         ygold = convert(atype, seq[i+1])
         total += sum(ygold .* ypred)
         count += sum(ygold)
-        x = ygold
+        x = seq[i+1]; x[:,end-1] = 0; x = convert(atype, x)
     end
 
-    lossval = -total/count
-    push!(values, AutoGrad.getval(lossval))
-    return lossval
+    return -total/count
 end
 
 # generate

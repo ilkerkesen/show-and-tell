@@ -50,7 +50,7 @@ function main(args)
         ("--batchsize"; arg_type=Int; default=256)
         ("--lr"; arg_type=Float32; default=Float32(0.001))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
-        ("--seed"; arg_type=Int; default=1; help="random seed")
+        ("--seed"; arg_type=Int; default=-1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--finetune"; action=:store_true; help="fine tune convnet")
         ("--adam"; action=:store_true; help="use adam optimizer")
@@ -148,7 +148,7 @@ function main(args)
             if iter % saveperiod == 0
                 lossval = bulkloss(w,s,o,valid,vocab)
                 @printf("\n(epoch/iter): %d/%d, loss: %g/%g [%s] ",
-                        epoch, iter, losstrn, lossval, now())
+                        epoch, iter, losstrn/i, lossval, now())
                 flush(STDOUT)
                 score, scores, bp, hlen, rlen =
                     validate(w, val, vocab, o)
@@ -173,7 +173,7 @@ function main(args)
                 bestloss = lossval <= bestloss ? lossval : bestloss
 
                 path, ext = splitext(abspath(o[:savefile]))
-                filename  = abspath(string(path, "iter-", iter, ext))
+                filename  = abspath(string(path, "-iter-", iter, ext))
                 savemodel(o, w, optparams, filename, score, lossval)
                 @printf("Model saved to %s.\n", filename); flush(STDOUT)
                 push!(checkpoints, filename)
@@ -286,7 +286,7 @@ function copy_optparams(optparams, o, w)
     for k = 1:length(optcopy)
         if typeof(optparams[k]) == Knet.Adam
             # init parameter
-            optcopy[k] = Adam(zeros(size(w[k])))
+            optcopy[k] = Adam()
 
             # scalar elements
             optcopy[k].lr = optparams[k].lr
