@@ -35,7 +35,7 @@ function main(args)
          help="use restval split for training")
 
         # model options
-        ("--winit"; arg_type=Float32; default=Float32(0.01))
+        ("--winit"; arg_type=Float32; default=Float32(0.08))
         ("--hidden"; arg_type=Int; default=512)
         ("--embed"; arg_type=Int; default=512)
         ("--convnet"; default="vgg19")
@@ -47,7 +47,7 @@ function main(args)
         # training options
         ("--nogpu"; action=:store_true)
         ("--epochs"; arg_type=Int; default=1)
-        ("--batchsize"; arg_type=Int; default=256)
+        ("--batchsize"; arg_type=Int; default=200)
         ("--lr"; arg_type=Float32; default=Float32(0.001))
         ("--gclip"; arg_type=Float32; default=Float32(5.0))
         ("--seed"; arg_type=Int; default=-1; help="random seed")
@@ -55,6 +55,7 @@ function main(args)
         ("--finetune"; action=:store_true; help="fine tune convnet")
         ("--adam"; action=:store_true; help="use adam optimizer")
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
+        ("--decayperiod"; arg_type=Int64; default=0)
         ("--fast"; action=:store_true; help="do not compute train loss")
         ("--saveperiod"; arg_type=Int; default=0)
         ("--newoptimizer"; action=:store_true)
@@ -109,7 +110,7 @@ function main(args)
     gc()
     const nsamples = length(train)
     const nbatches = div(nsamples, o[:batchsize])
-    const saveperiod = o[:saveperiod] > 0 ? o[:saveperiod] : nbatches
+
 
     # gradient check
     if o[:gcheck] > 0
@@ -124,21 +125,23 @@ function main(args)
     checkpoints = []
 
     # training
-    ids = [1:nsamples...]
+    sort!(train, by=i->length(i[2]))
+    sort!(valid, by=i->length(i[2]))
+    offsets = collect(1:o[:batchsize]:nsamples)
+    const saveperiod = o[:saveperiod] > 0 ? o[:saveperiod] : length(offsets)-1
     @printf("Training has been started (nbatches=%d, score=%g). [%s]\n",
             nbatches, bestscore, now())
     flush(STDOUT)
     for epoch = 1:o[:epochs]
         t0 = now()
-        shuffle!(ids)
 
         # data split training
         losstrn = 0
-        for i = 1:nbatches
+        orders = randperm(length(offsets)-1)
+        for (i,k) in enumerate(orders)
             iter = (epoch-1)*nbatches+i
-            lower = (i-1)*o[:batchsize]+1
-            upper = min(lower+o[:batchsize]-1, nsamples)
-            samples = train[ids[lower:upper]]
+            lower, upper = offsets[k:k+1]
+            samples = train[lower:upper-1]
             images, captions = make_batch(o, samples, vocab)
             batchloss = train!(w, s, images, captions, optparams, o)
             flush(STDOUT)
@@ -160,7 +163,7 @@ function main(args)
 
 
                 # learning rate decay
-                decay!(o, lossval, prevloss)
+                decay!(o, optparams, lossval, prevloss)
                 prevscore = score
                 prevloss  = lossval
                 gc()
@@ -193,10 +196,11 @@ function main(args)
     end # epoch end
 end
 
-function decay!(o, lossval, prevloss)
+function decay!(o, opts, lossval, prevloss)
     if !o[:adam] && lossval > prevloss
-        @printf("\nlr decay...\n"); flush(STDOUT)
         o[:lr] *= o[:decay]
+        @printf("\nlr decay. new lr=%g\n", o[:lr]); flush(STDOUT)
+        for opt in opts; opt.lr = o[:lr]; end
     end
 end
 
@@ -271,7 +275,7 @@ function get_optparams(o, w)
         optcnn = load(o[:loadfile], "optcnn")
         if o[:finetune] && optcnn == nothing
             for k = 1:length(w)-o[:wdlen]
-                optcnn[k] = o[:adam]?Adam(w[k]; lr=o[:lr]):Sgd(;lr=o[:lr])
+                optcnn[k] = o[:adam]?Adam(; lr=o[:lr]):Sgd(;lr=o[:lr])
             end
         end
         optparams = load(o[:loadfile], "optparams")

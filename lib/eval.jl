@@ -32,7 +32,9 @@ function bleu(hyp, ref)
             c2 = map(
                 x -> mapreduce(r -> get(r[n], x, 0), max, refscounts),
                 keys(hypcounts[n]))
-            clipped[n] += sum(map(k->min(c1[k],c2[k]), 1:length(c1)))
+            if length(c1) >= 1
+                clipped[n] += sum(map(k->min(c1[k],c2[k]), 1:length(c1)))
+            end
             total[n] += sum(c1)
         end
     end
