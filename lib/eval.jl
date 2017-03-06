@@ -34,8 +34,8 @@ function bleu(hyp, ref)
                 keys(hypcounts[n]))
             if length(c1) >= 1
                 clipped[n] += sum(map(k->min(c1[k],c2[k]), 1:length(c1)))
+                total[n] += sum(c1)
             end
-            total[n] += sum(c1)
         end
     end
 

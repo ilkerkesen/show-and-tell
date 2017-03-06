@@ -23,7 +23,7 @@ function train!(w, s, image, captions, optparams, o)
         s[i] = AutoGrad.getval(s[i])
     end
 
-    return values[1]
+    return values
 end
 
 # for testing
@@ -33,15 +33,21 @@ function bulkloss(w, s, o, data, vocab)
     nbatches = div(nsamples, o[:batchsize])
 
     total = 0.0
-    count = 0
+    nwords = 0
+    newo = Dict(
+        :finetune => get(o, :finetune, false),
+        :wdlen => get(o, :wdlen, 6)
+    )
     for i = 1:nbatches
         lower = (i-1)*o[:batchsize]+1
         upper = min(lower+o[:batchsize]-1, nsamples)
         samples = data[ids[lower:upper]]
         images, captions = make_batch(o, samples, vocab)
-        total += loss(w, copy(s), images, captions; o=o)
-        count += 1
+        values = []
+        loss(w, copy(s), images, captions; o=newo, values=values)
+        total  += values[1]
+        nwords += values[2]
         images, captions = 0, 0; gc(); flush(STDOUT)
     end
-    return total/count
+    return total/nwords
 end

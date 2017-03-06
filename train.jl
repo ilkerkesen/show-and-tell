@@ -89,7 +89,7 @@ function main(args)
     prevscore = bestscore = o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
     prevloss  = bestloss  = o[:loadfile] == nothing ? Inf : load(o[:loadfile], "lossval")
     w = get_weights(o)
-    s = initstate(o[:atype], size(w[end-3], 1), o[:batchsize])
+    s = initstate(o[:atype], o[:hidden], o[:batchsize])
     o[:wdlen] = length(w)
     wcnn = get_wcnn(o)
     w = wcnn == nothing ? w : [wcnn; w]
@@ -137,21 +137,23 @@ function main(args)
 
         # data split training
         losstrn = 0
+        nwords  = 0
         orders = randperm(length(offsets)-1)
         for (i,k) in enumerate(orders)
             iter = (epoch-1)*nbatches+i
             lower, upper = offsets[k:k+1]
             samples = train[lower:upper-1]
             images, captions = make_batch(o, samples, vocab)
-            batchloss = train!(w, s, images, captions, optparams, o)
+            this_loss, this_words = train!(w, s, images, captions, optparams, o)
             flush(STDOUT)
             images = 0; captions = 0; ans = 0; gc()
-            losstrn += batchloss
+            losstrn += this_loss
+            nwords  += this_words
 
             if iter % saveperiod == 0
                 lossval = bulkloss(w,s,o,valid,vocab)
                 @printf("\n(epoch/iter): %d/%d, loss: %g/%g [%s] ",
-                        epoch, iter, losstrn/i, lossval, now())
+                        epoch, iter, losstrn/nwords, lossval, now())
                 flush(STDOUT)
                 score, scores, bp, hlen, rlen =
                     validate(w, val, vocab, o)
@@ -227,7 +229,7 @@ function validate(w, data, vocab, o; metric=bleu, split="val")
     wcnn = o[:finetune] ? w[1:o[:wdlen]] : nothing
     wdec = o[:finetune] ? w[end-o[:wdlen]+1:end] : w
     hyp, ref = [], []
-    s = initstate(o[:atype], size(w[end-3], 1), 1)
+    s = initstate(o[:atype], o[:hidden], 1)
 
     hyp, ref = h5open(o[:images], "r") do f
         hyp, ref = [], []
