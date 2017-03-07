@@ -75,25 +75,31 @@ function main(args)
     # parse args
     @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
-    o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+    o = parse_args(args, s; as_symbols=true); display(o); flush(STDOUT)
 
     # random seed
-    o[:seed] > 0 && srand(o[:seed])
+    s = o[:seed] > 0 ? srand(o[:seed]) : srand()
+    @printf("\nrandom seed:\n")
+    display(s.seed); println(); flush(STDOUT)
 
     # load vocabulary
     vocab = load(o[:vocabfile], "vocab")
     o[:vocabsize] = vocab.size
+    println("Vocabulary loaded."); flush(STDOUT)
 
     # initialize state and weights
     o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
-    prevscore = bestscore = o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
-    prevloss  = bestloss  = o[:loadfile] == nothing ? Inf : load(o[:loadfile], "lossval")
+    prevscore = bestscore =
+        o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
+    prevloss = bestloss =
+        o[:loadfile] == nothing ? Inf : load(o[:loadfile], "lossval")
     w = get_weights(o)
     s = initstate(o[:atype], o[:hidden], o[:batchsize])
     o[:wdlen] = length(w)
     wcnn = get_wcnn(o)
     w = wcnn == nothing ? w : [wcnn; w]
     optparams = get_optparams(o, w)
+    println("Model loaded."); flush(STDOUT)
 
     # get samples used during training process
     train, restval, val = get_entries(o[:captions], ["train", "restval", "val"])
@@ -110,6 +116,7 @@ function main(args)
     gc()
     const nsamples = length(train)
     const nbatches = div(nsamples, o[:batchsize])
+    println("Data loaded."); flush(STDOUT)
 
 
     # gradient check
@@ -127,11 +134,10 @@ function main(args)
     # training
     sort!(train, by=i->length(i[2]))
     sort!(valid, by=i->length(i[2]))
-    offsets = collect(1:o[:batchsize]:nsamples)
+    offsets = collect(1:o[:batchsize]:nsamples+1)
     const saveperiod = o[:saveperiod] > 0 ? o[:saveperiod] : length(offsets)-1
-    @printf("Training has been started (nbatches=%d, score=%g). [%s]\n",
-            nbatches, bestscore, now())
-    flush(STDOUT)
+    @printf("Training started (nsamples=%d, nbatches=%d, loss=%g, score=%g). [%s]\n",
+        nbatches, prevloss, prevscore, now()); flush(STDOUT)
     for epoch = 1:o[:epochs]
         t0 = now()
 
@@ -155,14 +161,14 @@ function main(args)
                 @printf("\n(epoch/iter): %d/%d, loss: %g/%g [%s] ",
                         epoch, iter, losstrn/nwords, lossval, now())
                 flush(STDOUT)
-                score, scores, bp, hlen, rlen =
+                scores, bp, hlen, rlen =
                     validate(w, val, vocab, o)
-                @printf("\nBLEU = %.1f, %.1f/%.1f/%.1f/%.1f ",
-                        100*score, map(i->i*100,scores)...)
+                @printf("\nBLEU = %.1f/%.1f/%.1f/%.1f ",
+                        map(i->i*100,scores)...)
                 @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d) [%s]\n",
                         bp, hlen/rlen, hlen, rlen, now())
                 flush(STDOUT)
-
+                score = scores[end]
 
                 # learning rate decay
                 decay!(o, optparams, lossval, prevloss)
@@ -181,6 +187,8 @@ function main(args)
                 filename  = abspath(string(path, "-iter-", iter, ext))
                 savemodel(o, w, optparams, filename, score, lossval)
                 @printf("Model saved to %s.\n", filename); flush(STDOUT)
+
+                # keep track of checkpoints
                 push!(checkpoints, filename)
                 if length(checkpoints) > o[:checkpoints]
                     oldest = shift!(checkpoints)

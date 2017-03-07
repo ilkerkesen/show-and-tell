@@ -11,8 +11,8 @@ end
 # w[3] & w[4] => weight and bias params for softmax layer
 # w[5] & w[6] => weights for visual and textual embeddings
 # s[1] & s[2] => hidden state and cell state of LSTM net
-function initweights(atype, hidden, visual, vocab, embed, winit, bias=false)
-    w = Array(Any, 6 + 2 * bias)
+function initweights(atype, hidden, visual, vocab, embed, winit)
+    w = Array(Any, 6)
     input = embed
     w[1] = winit*randn(input+hidden, 4*hidden)
     w[2] = zeros(1, 4*hidden)
@@ -21,9 +21,5 @@ function initweights(atype, hidden, visual, vocab, embed, winit, bias=false)
     w[4] = zeros(1, vocab)
     w[5] = winit*randn(visual, embed)
     w[6] = winit*randn(vocab, embed)
-    if bias
-        w[7] = zeros(1, embed)
-        w[8] = zeros(1, embed)
-    end
     return map(i->convert(atype, i), w)
 end

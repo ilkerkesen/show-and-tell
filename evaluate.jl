@@ -38,9 +38,9 @@ function main(args)
     # evaluate
     ti = now()
     @printf("Evaluation started (date=%s)\n", ti)
-    score, scores, bp, hlen, rlen = bleu(hyp, ref)
-    @printf("BLEU = %.1f, %.1f/%.1f/%.1f/%.1f ",
-            100*score, map(i->i*100,scores)...)
+    scores, bp, hlen, rlen = bleu(hyp, ref)
+    @printf("BLEU = %.1f/%.1f/%.1f/%.1f ",
+            map(i->i*100,scores)...)
     @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d)\n",
             bp, hlen/rlen, hlen, rlen)
     tf = now()

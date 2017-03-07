@@ -49,7 +49,7 @@ function decoder(w, s, vis, seq; o=Dict())
         ygold = convert(atype, seq[i+1])
         total += sum(ygold .* ypred)
         count += sum(ygold)
-        x = seq[i+1]; # x[:,end-1] = 0; x = convert(atype, x) # FIXME
+        x = ygold
     end
 
 
@@ -125,5 +125,5 @@ function generate(w, wcnn, s, vis, vocab; maxlen=20, beamsize=1)
         pop!(sentence)
     end
     push!(sentence, ".")
-    output = join(sentence[2:end], " ")
+    output = join(filter(word -> word != UNK, sentence[2:end]), " ")
 end

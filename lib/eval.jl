@@ -48,10 +48,13 @@ function bleu(hyp, ref)
     if hypothesis_length < references_length
         brevity_penalty = exp(1-references_length/hypothesis_length)
     end
-    geometric_mean = reduce(*, scores)^(1/length(scores))
-    score = geometric_mean * brevity_penalty
 
-    (score, scores, brevity_penalty, hypothesis_length, references_length)
+    bleuN = Array(Float64, 4)
+    for k = 1:4
+        bleuN[k] = brevity_penalty * exp(mean(map(log, scores[1:k])))
+    end
+
+    (bleuN, brevity_penalty, hypothesis_length, references_length)
 end
 
 function countdict(xs)
