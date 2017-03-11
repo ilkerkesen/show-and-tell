@@ -7,19 +7,26 @@ function initstate(atype, hidden, batchsize)
 end
 
 # initialize all weights of decoder network
-# w[1] & w[2] => weight and bias params for LSTM network
-# w[3] & w[4] => weight and bias params for softmax layer
-# w[5] & w[6] => weights for visual and textual embeddings
-# s[1] & s[2] => hidden state and cell state of LSTM net
-function initweights(atype, hidden, visual, vocab, embed, winit)
-    w = Array(Any, 6)
-    input = embed
-    w[1] = winit*randn(input+hidden, 4*hidden)
-    w[2] = zeros(1, 4*hidden)
-    w[2][1:hidden] = 1 # forget gate bias
-    w[3] = winit*randn(hidden, vocab)
-    w[4] = zeros(1, vocab)
-    w[5] = winit*randn(visual, embed)
-    w[6] = winit*randn(vocab, embed)
-    return map(i->convert(atype, i), w)
+function initweights(o::Dict)
+    w = Dict()
+    w["wdec"] = o[:winit]*randn(o[:embed]+o[:hidden], 4*o[:hidden])
+    w["bdec"] = zeros(1, 4*o[:hidden])
+    w["bdec"][1:o[:hidden]] = 1 # forget gate bias
+    w["wsoft"] = o[:winit]*randn(o[:hidden], o[:vocabsize])
+    w["bsoft"] = zeros(1, o[:vocabsize])
+    w["vemb"] = o[:winit]*randn(o[:visual], o[:embed])
+    w["wemb"] = o[:winit]*randn(o[:vocabsize], o[:embed])
+    return convert_weight(o[:atype], w)
+end
+
+function convert_weight(atype, w::Dict)
+    Dict(k => convert(atype,v) for (k,v) in w)
+end
+
+function convert_weight(atype, w::Array{Any})
+    map(i->convert(atype,w[i]), [1:length(w)...])
+end
+
+function convert_weight{T<:Number}(atype, w::Array{T})
+    convert(atype, w)
 end

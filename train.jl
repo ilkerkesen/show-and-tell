@@ -62,6 +62,7 @@ function main(args)
         ("--evalmetric"; default="bleu")
         ("--beamsize"; arg_type=Int; default=1)
         ("--checkpoints"; arg_type=Int; default=1)
+        ("--sortbylen"; action=:store_true)
 
         # dropout values
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
@@ -75,7 +76,7 @@ function main(args)
     # parse args
     @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
-    o = parse_args(args, s; as_symbols=true); display(o); flush(STDOUT)
+    o = parse_args(args, s; as_symbols=true); (o); flush(STDOUT)
 
     # random seed
     s = o[:seed] > 0 ? srand(o[:seed]) : srand()
@@ -95,10 +96,11 @@ function main(args)
         o[:loadfile] == nothing ? Inf : load(o[:loadfile], "lossval")
     w = get_weights(o)
     s = initstate(o[:atype], o[:hidden], o[:batchsize])
-    o[:wdlen] = length(w)
-    wcnn = get_wcnn(o)
-    w = wcnn == nothing ? w : [wcnn; w]
-    optparams = get_optparams(o, w)
+    wcnn =  get_wcnn(o)
+    if wcnn != nothing && o[:finetune]
+        w[:wcnn] = wcnn
+    end
+    opts = get_opts(o, w)
     println("Model loaded."); flush(STDOUT)
 
     # get samples used during training process
@@ -123,7 +125,8 @@ function main(args)
     if o[:gcheck] > 0
         ids = shuffle([1:nsamples...])[1:o[:batchsize]]
         images, captions = make_batch(o, train[ids], vocab)
-        gradcheck(loss, w, copy(s), images, captions; gcheck=o[:gcheck])
+        gradcheck(
+            loss, w, copy(s), images, captions; gcheck=o[:gcheck], verbose=true)
         images
         gc()
     end
@@ -131,26 +134,39 @@ function main(args)
     # checkpoints
     checkpoints = []
 
-    # training
-    sort!(train, by=i->length(i[2]))
+    # sort sequences
+    if o[:sortbylen]
+        sort!(train, by=i->length(i[2]))
+    end
     sort!(valid, by=i->length(i[2]))
     offsets = collect(1:o[:batchsize]:nsamples+1)
+
+    # training
     const saveperiod = o[:saveperiod] > 0 ? o[:saveperiod] : length(offsets)-1
+    display(w); println()
+    display(opts); println()
+    info(bulkloss(w,s,o,valid,vocab))
+    println()
     @printf("Training started (nsamples=%d, nbatches=%d, loss=%g, score=%g). [%s]\n",
-        nbatches, prevloss, prevscore, now()); flush(STDOUT)
+            nsamples, nbatches, prevloss, prevscore, now()); flush(STDOUT)
     for epoch = 1:o[:epochs]
         t0 = now()
 
         # data split training
         losstrn = 0
         nwords  = 0
-        orders = randperm(length(offsets)-1)
+        if !o[:sortbylen]
+            shuffle!(train)
+            orders = [1:(length(offsets)-1)...]
+        else
+            orders = randperm(length(offsets)-1)
+        end
         for (i,k) in enumerate(orders)
             iter = (epoch-1)*nbatches+i
             lower, upper = offsets[k:k+1]
             samples = train[lower:upper-1]
             images, captions = make_batch(o, samples, vocab)
-            this_loss, this_words = train!(w, s, images, captions, optparams, o)
+            this_loss, this_words = train!(w, s, images, captions, opts, o)
             flush(STDOUT)
             images = 0; captions = 0; ans = 0; gc()
             losstrn += this_loss
@@ -171,7 +187,7 @@ function main(args)
                 score = scores[end]
 
                 # learning rate decay
-                decay!(o, optparams, lossval, prevloss)
+                decay!(o, opts, lossval, prevloss)
                 prevscore = score
                 prevloss  = lossval
                 gc()
@@ -185,7 +201,7 @@ function main(args)
 
                 path, ext = splitext(abspath(o[:savefile]))
                 filename  = abspath(string(path, "-iter-", iter, ext))
-                savemodel(o, w, optparams, filename, score, lossval)
+                savemodel(o, w, opts, filename, score, lossval)
                 @printf("Model saved to %s.\n", filename); flush(STDOUT)
 
                 # keep track of checkpoints
@@ -207,35 +223,42 @@ function main(args)
 end
 
 function decay!(o, opts, lossval, prevloss)
-    if !o[:adam] && lossval > prevloss
+    if o[:lr] < 1.0 && lossval > prevloss
         o[:lr] *= o[:decay]
         @printf("\nlr decay. new lr=%g\n", o[:lr]); flush(STDOUT)
-        for opt in opts; opt.lr = o[:lr]; end
+        decay!(o[:lr], opts)
     end
 end
 
-function savemodel(o, w, optparams, filename, score, lossval)
-    o[:savefile] == nothing && return
+function decay!(lr, opts::Dict)
+    for k in keys(opts)
+        decay!(lr, opts[k])
+    end
+end
 
-    wcopy = map(x -> convert(Array{Float32}, x), w)
-    wcnn = o[:finetune] ? wcopy[1:end-o[:wdlen]] : nothing
+function decay!(lr, opts::Array)
+    for k in 1:length(opts)
+        decay!(lr, opts[k])
+    end
+end
 
-    # optparams
-    optcopy = copy_optparams(optparams, o, w)
-    optcnn = o[:finetune] ? optcopy[1:end-o[:wdlen]] : nothing
+function decay!(lr, opt::Union{Knet.Adam,Knet.Sgd})
+    opt.lr = lr
+end
 
-    save(filename,
-         "wcnn", wcnn,
-         "w", wcopy[end-o[:wdlen]+1:end],
-         "optcnn", optcnn,
-         "optparams", optcopy[end-o[:wdlen]+1:end],
-         "score", score,
-         "lossval", lossval)
+function savemodel(o, w, opts, filename, score, lossval)
+    if o[:savefile] != nothing
+        save(filename,
+             "w", copy_weights(w),
+             "opts", copy_opts(opts, w, true),
+             "score", score,
+             "lossval", lossval)
+    end
 end
 
 function validate(w, data, vocab, o; metric=bleu, split="val")
-    wcnn = o[:finetune] ? w[1:o[:wdlen]] : nothing
-    wdec = o[:finetune] ? w[end-o[:wdlen]+1:end] : w
+    wcnn = o[:finetune] ? w[:wcnn] : nothing
+    wdec = w
     hyp, ref = [], []
     s = initstate(o[:atype], o[:hidden], 1)
 
@@ -244,7 +267,7 @@ function validate(w, data, vocab, o; metric=bleu, split="val")
         for entry in data
             image = read(f, entry["filename"])
             caption = generate(
-                wdec, wcnn, copy(s), image, vocab; beamsize=o[:beamsize])
+                wdec, copy(s), image, vocab; beamsize=o[:beamsize])
             push!(hyp, caption)
             push!(ref, map(s->s["raw"], entry["sentences"]))
         end
@@ -256,11 +279,10 @@ end
 
 function get_weights(o)
     if o[:loadfile] == nothing
-        w = initweights(o[:atype], o[:hidden], o[:visual],
-                        o[:vocabsize], o[:embed], o[:winit])
+        w = initweights(o)
     else
         w = load(o[:loadfile], "w")
-        w = map(i->convert(o[:atype], i), w)
+        w = convert_weight(o[:atype], w)
     end
     return w
 end
@@ -275,48 +297,79 @@ function get_wcnn(o)
     end
 end
 
-function get_optparams(o, w)
+function get_opts(o,w)
     if o[:loadfile] == nothing || o[:newoptimizer]
-        optparams = Array(Any, length(w))
-        for k = 1:length(optparams)
-            optparams[k] = o[:adam]?Adam(;lr=o[:lr]):Sgd(;lr=o[:lr])
-        end
+        return init_opts(o,w)
     elseif o[:loadfile] != nothing
-        optcnn = load(o[:loadfile], "optcnn")
-        if o[:finetune] && optcnn == nothing
-            for k = 1:length(w)-o[:wdlen]
-                optcnn[k] = o[:adam]?Adam(; lr=o[:lr]):Sgd(;lr=o[:lr])
-            end
-        end
-        optparams = load(o[:loadfile], "optparams")
-        optparams = o[:finetune] ? [optcnn; optparams] : optparams
+        opts = load(o[:loadfile], "opts")
+        return copy_opts(opts,w,false)
     end
-    return optparams
 end
 
-function copy_optparams(optparams, o, w)
-    length(optparams) == length(w) || error("length mismatch (w/opt)")
-    optcopy = Array(Any, length(optparams))
-    for k = 1:length(optcopy)
-        if typeof(optparams[k]) == Knet.Adam
-            # init parameter
-            optcopy[k] = Adam()
+function copy_opts(opt::Knet.Sgd, w, save)
+    Sgd(;lr=opt.lr)
+end
 
-            # scalar elements
-            optcopy[k].lr = optparams[k].lr
-            optcopy[k].beta1 = optparams[k].beta1
-            optcopy[k].beta2 = optparams[k].beta2
-            optcopy[k].t = optparams[k].t
-            optcopy[k].eps = optparams[k].eps
+function copy_opts(opt::Knet.Adam, w, save)
+    optcopy = Adam()
 
-            # array elements
-            optcopy[k].fstm = Array(optparams[k].fstm)
-            optcopy[k].scndm = Array(optparams[k].scndm)
-        elseif typeof(optparams[k]) == Knet.Sgd
-            optcopy[k] = Sgd(;lr=optparams[k].lr)
-        end
+    # scalar elements
+    optcopy.lr = opt.lr
+    optcopy.beta1 = opt.beta1
+    optcopy.beta2 = opt.beta2
+    optcopy.t = opt.t
+    optcopy.eps = opt.eps
+
+    # array elements
+    if save
+        optcopy.fstm  = Array(opt.fstm)
+        optcopy.scndm = Array(opt.scndm)
+    else
+        optcopy.fstm = convert(typeof(w), opt.fstm)
+        optcopy.scndm = convert(typeof(w), opt.scndm)
+    end
+
+    return optcopy
+end
+
+function copy_opts(opts::Dict, w::Dict, save)
+    optcopy = Dict()
+    for k in keys(w)
+        optcopy[k] = copy_opts(opts[k], w[k], save)
     end
     return optcopy
+end
+
+function copy_opts(opts::Array, w::Array, save)
+    map(i -> copy_opts(opts[i], w[i], save), [1:length(w)...])
+end
+
+function init_opts(o, w::Dict)
+    opts = Dict()
+    for (k,v) in w
+        opts[k] = init_opts(o,v)
+    end
+    return opts
+end
+
+function init_opts(o, w::Array)
+    map(i->init_opts(o,w[i]), [1:length(w)...])
+end
+
+function init_opts{T<:Number}(o, w::Union{KnetArray{T},Array{T}})
+    (o[:adam] ? Adam : Sgd)(;lr=o[:lr],gclip=o[:gclip])
+end
+
+function copy_weights(w::Dict)
+    Dict(k => copy_weights(v) for (k,v) in w)
+end
+
+function copy_weights(w::Array)
+    map(i->copy_weights(w[i]), [1:length(w)...])
+end
+
+function copy_weights{T<:Number}(w::Union{KnetArray{T}, Array{T}})
+    Array(w)
 end
 
 !isinteractive() && !isdefined(Core.Main, :load_only) && main(ARGS)

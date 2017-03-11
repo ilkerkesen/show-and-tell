@@ -1,28 +1,8 @@
 # one minibatch training
-function train!(w, s, image, captions, optparams, o)
+function train!(w, s, image, captions, opts, o)
     values = []
     gloss = lossgradient(w, copy(s), image, captions; o=o, values=values)
-
-    # gradient clipping
-    gscale = o[:lr]
-    if o[:gclip] > 0
-        gnorm = sqrt(mapreduce(sumabs2, +, 0, gloss))
-        if gnorm > o[:gclip]
-            gscale *= o[:gclip] / gnorm
-        end
-    end
-
-    # update parameters
-    for k in 1:length(w)
-        optparams[k].lr = gscale
-        update!(w[k], gloss[k], optparams[k])
-    end
-
-    isa(s,Vector{Any}) || error("State should not be Boxed.")
-    for i = 1:length(s)
-        s[i] = AutoGrad.getval(s[i])
-    end
-
+    update!(w, gloss, opts)
     return values
 end
 
@@ -35,8 +15,7 @@ function bulkloss(w, s, o, data, vocab)
     total = 0.0
     nwords = 0
     newo = Dict(
-        :finetune => get(o, :finetune, false),
-        :wdlen => get(o, :wdlen, 6)
+        :finetune => get(o, :finetune, false)
     )
     for i = 1:nbatches
         lower = (i-1)*o[:batchsize]+1
@@ -51,3 +30,14 @@ function bulkloss(w, s, o, data, vocab)
     end
     return total/nwords
 end
+
+# oparams{T<:Number}(::KnetArray{T}; p...)=Adam()
+# oparams{T<:Number}(::Array{T}; p...)=Adam()
+# oparams(a::Associative; p...)=Dict(k=>oparams(v) for (k,v) in a)
+# oparams(a; p...)=map(x->oparams(x;p...), a)
+
+# Training started (nsamples=30000, nbatches=120, loss=Inf, score=0). [2017-03-12T00:57:09.813]
+
+# (epoch/iter): 1/120, loss: 4.64231/3.83807 [2017-03-12T00:58:30.048]
+# BLEU = 60.5/33.7/18.9/11.5 (BP=0.941512, ratio=0.943157, hyp_len=8263, ref_len=8761) [2017-03-12T00:58:44.928]
+# Model saved to /mnt/kufs/scratch/ikesen16/data/image-captioning/trained/nic-flickr8k-vgg16-v6-nofinetune-a-iter-120.jld
