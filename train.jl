@@ -76,7 +76,7 @@ function main(args)
     # parse args
     @printf("\nScript started. [%s]\n", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
-    o = parse_args(args, s; as_symbols=true); (o); flush(STDOUT)
+    o = parse_args(args, s; as_symbols=true); display(o); flush(STDOUT)
 
     # random seed
     s = o[:seed] > 0 ? srand(o[:seed]) : srand()
@@ -143,10 +143,6 @@ function main(args)
 
     # training
     const saveperiod = o[:saveperiod] > 0 ? o[:saveperiod] : length(offsets)-1
-    display(w); println()
-    display(opts); println()
-    info(bulkloss(w,s,o,valid,vocab))
-    println()
     @printf("Training started (nsamples=%d, nbatches=%d, loss=%g, score=%g). [%s]\n",
             nsamples, nbatches, prevloss, prevscore, now()); flush(STDOUT)
     for epoch = 1:o[:epochs]

@@ -128,59 +128,6 @@ function get_vgg_weights(vggmat; last_layer="relu7")
     map(KnetArray, ws)
 end
 
-# resnet models
-# mode, 0=>train, 1=>test
-function resnet50(w,x,ms; mode=1)
-    # layer 1
-    conv1  = conv4(w[1],x; padding=3, stride=2) .+ w[2]
-    bn1    = batchnorm(w[3:4],conv1,ms; mode=mode)
-    pool1  = pool(bn1; window=3, stride=2)
-
-    # layer 2,3,4,5
-    r2 = reslayerx5(w[5:34], pool1, ms; strides=[1,1,1,1], mode=mode)
-    r3 = reslayerx5(w[35:73], r2, ms; mode=mode)
-    r4 = reslayerx5(w[74:130], r3, ms; mode=mode) # 5
-    r5 = reslayerx5(w[131:160], r4, ms; mode=mode)
-
-    # fully connected layer
-    pool5  = pool(r5; stride=1, window=7, mode=2)
-    fc1000 = w[161] * mat(pool5) .+ w[162]
-end
-
-# mode, 0=>train, 1=>test
-function resnet101(w,x,ms; mode=1)
-    # layer 1
-    conv1 = reslayerx1(w[1:3],x,ms; padding=3, stride=2, mode=mode)
-    pool1 = pool(conv1; window=3, stride=2)
-
-    # layer 2,3,4,5
-    r2 = reslayerx5(w[4:33], pool1, ms; strides=[1,1,1,1], mode=mode)
-    r3 = reslayerx5(w[34:72], r2, ms; mode=mode)
-    r4 = reslayerx5(w[73:282], r3, ms; mode=mode)
-    r5 = reslayerx5(w[283:312], r4, ms; mode=mode)
-
-    # fully connected layer
-    pool5  = pool(r5; stride=1, window=7, mode=2)
-    fc1000 = w[313] * mat(pool5) .+ w[314]
-end
-
-# mode, 0=>train, 1=>test
-function resnet152(w,x,ms; mode=1)
-    # layer 1
-    conv1 = reslayerx1(w[1:3],x,ms; padding=3, stride=2, mode=mode)
-    pool1 = pool(conv1; window=3, stride=2)
-
-    # layer 2,3,4,5
-    r2 = reslayerx5(w[4:33], pool1, ms; strides=[1,1,1,1], mode=mode)
-    r3 = reslayerx5(w[34:108], r2, ms; mode=mode)
-    r4 = reslayerx5(w[109:435], r3, ms; mode=mode)
-    r5 = reslayerx5(w[436:465], r4, ms; mode=mode)
-
-    # fully connected layer
-    pool5  = pool(r5; stride=1, window=7, mode=2)
-    fc1000 = w[466] * mat(pool5) .+ w[467]
-end
-
 # mode, 0=>train, 1=>test
 function resnet50(w,x,ms; mode=1)
     # layer 1
