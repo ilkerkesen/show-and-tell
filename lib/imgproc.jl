@@ -39,3 +39,9 @@ function process_image(
 
     return permutedims(e1, [2,1,3,4]) # transpose
 end
+
+function make_average_image(avgimg)
+    output = reshape(avgimg, size(avgimg)..., 1)
+    output = permutedims(output, [2,1,3,4])
+    output = convert(Array{Float32}, output)
+end

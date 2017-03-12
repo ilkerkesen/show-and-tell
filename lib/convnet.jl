@@ -107,7 +107,10 @@ function vgg19(w, x; o=Dict())
         fc6 = dropout(fc6, fc6drop)
         fc7 = w[35] * mat(fc6) .+ w[36]
         fc7 = relu(fc7)
+        return fc7
     end
+
+    return conv5_4
 end
 
 function get_vgg_weights(vggmat; last_layer="relu7")
