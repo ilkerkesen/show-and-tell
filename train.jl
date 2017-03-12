@@ -98,7 +98,7 @@ function main(args)
     s = initstate(o[:atype], o[:hidden], o[:batchsize])
     wcnn =  get_wcnn(o)
     if wcnn != nothing && o[:finetune]
-        w[:wcnn] = wcnn
+        w["wcnn"] = wcnn
     end
     opts = get_opts(o, w)
     println("Model loaded."); flush(STDOUT)
