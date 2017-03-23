@@ -40,8 +40,8 @@ function main(args)
         ("--embed"; arg_type=Int; default=512)
         ("--convnet"; default="vgg19")
         ("--lastlayer"; default="relu7")
-        ("--visual"; arg_type=Int; default=4096)
-        ("--featuremaps"; action=:store_true)
+        ("--visual"; arg_type=Int; nargs='+'; default=[4096])
+        # ("--featuremaps"; action=:store_true)
         ("--cnnmode"; arg_type=Int; default=1)
 
         # training options
@@ -71,6 +71,7 @@ function main(args)
         ("--wembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
         ("--membdrop"; arg_type=Float32; default=Float32(0.0))
+        ("--attdrop"; arg_type=Float32; default=Float32(0.0))
     end
 
     # parse args
@@ -124,7 +125,7 @@ function main(args)
     # gradient check
     if o[:gcheck] > 0
         ids = shuffle([1:nsamples...])[1:o[:batchsize]]
-        images, captions = make_batch(o, train[ids], vocab)
+        images, captions, masks = make_batch(o, train[ids], vocab)
         gradcheck(
             loss, w, copy(s), images, captions; gcheck=o[:gcheck], verbose=true)
         images
@@ -161,8 +162,9 @@ function main(args)
             iter = (epoch-1)*nbatches+i
             lower, upper = offsets[k:k+1]
             samples = train[lower:upper-1]
-            images, captions = make_batch(o, samples, vocab)
-            this_loss, this_words = train!(w, s, images, captions, opts, o)
+            images, captions, masks = make_batch(o, samples, vocab)
+            this_loss, this_words = train!(
+                w, s, images, captions, masks, opts, o)
             flush(STDOUT)
             images = 0; captions = 0; ans = 0; gc()
             losstrn += this_loss

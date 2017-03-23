@@ -19,3 +19,16 @@ function lstm(weight, bias, hidden, cell, input)
     hidden  = outgate .* tanh(cell)
     return (hidden,cell)
 end
+
+function logprob(output, ypred, mask=nothing)
+    nrows,ncols = size(ypred)
+    index = similar(output)
+    @inbounds for i=1:length(output)
+        index[i] = i + (output[i]-1)*nrows
+    end
+    o1 = logp(ypred,2)
+    index = mask == nothing ? index : index[mask]
+    o2 = o1[index]
+    o3 = sum(o2)
+    return o3
+end

@@ -1,15 +1,13 @@
 # loss functions
-function loss(w, s, visual, captions; o=Dict(), values=[])
+function loss(w, s, visual, captions, masks; o=Dict(), values=[])
     finetune = get(o, :finetune, false)
+    atype = typeof(AutoGrad.getval(w["wdec"]))
+    visual = convert(atype, visual)
     if finetune && haskey(w, "wcnn")
-        visual = vgg19(w[1:end-wdlen], KnetArray(visual); o=o)
+        visual = vgg19(w["wcnn"], visual; o=o)
         visual = transpose(visual)
-    else
-        atype = typeof(AutoGrad.getval(w["wdec"]))
-        visual = convert(atype, visual)
     end
-
-    lossval, nwords = decoder(w, s, visual, captions; o=o)
+    lossval, nwords = decoder(w, s, visual, captions, masks; o=o)
     push!(values, AutoGrad.getval(lossval), AutoGrad.getval(nwords))
     return lossval/nwords
 end
@@ -18,7 +16,7 @@ end
 lossgradient = grad(loss)
 
 # loss function for decoder network
-function decoder(w, s, vis, seq; o=Dict())
+function decoder(w, s, vis, seq, masks; o=Dict())
     total, count = 0, 0
     atype = typeof(AutoGrad.getval(w["wdec"]))
 
@@ -37,18 +35,13 @@ function decoder(w, s, vis, seq; o=Dict())
     (s[1], s[2]) = lstm(w["wdec"], w["bdec"], s[1], s[2], x)
 
     # textual features
-    x = convert(atype, seq[1])
-    for i = 1:length(seq)-1
-        x = x * w["wemb"]
+    for t in 1:length(seq)-1
+        x = w["wemb"][seq[t],:]
         x = dropout(x, wembdrop)
         (s[1], s[2]) = lstm(w["wdec"], w["bdec"], s[1], s[2], x)
-        ht = s[1]
-        ht = dropout(ht, softdrop)
-        ypred = logp(ht * w["wsoft"] .+ w["bsoft"], 2)
-        ygold = convert(atype, seq[i+1])
-        total += sum(ygold .* ypred)
-        count += sum(ygold)
-        x = ygold
+        ypred = dropout(s[1], softdrop) * w["wsoft"] .+ w["bsoft"]
+        total += logprob(seq[t+1], ypred, masks[t])
+        count += sum(masks[t])
     end
 
     return (-total,count)
@@ -58,13 +51,12 @@ end
 function generate(w, s, vis, vocab; maxlen=20, beamsize=1)
     atype = typeof(AutoGrad.getval(w["wdec"]))
     wcnn  = get(w, "wcnn", nothing)
+    vis = convert(atype, vis)
     if wcnn != nothing
-        vis = KnetArray(vis)
         vis = vgg19(wcnn, vis)
         vis = transpose(vis)
-    else
-        vis = convert(atype, vis)
     end
+
     x = vis * w["vemb"]
     (s[1], s[2]) = lstm(w["wdec"], w["bdec"], s[1], s[2], x)
 
@@ -85,9 +77,8 @@ function generate(w, s, vis, vocab; maxlen=20, beamsize=1)
             end
 
             # get probabilities
-            onehotvec = zeros(Cuchar, 1, vocab.size)
-            onehotvec[word2index(vocab, word)] = 1
-            x = convert(atype, onehotvec) * w["wemb"]
+            x = w["wemb"][word2index(vocab,word),:]
+            x = reshape(x, 1, length(x))
             (st[1], st[2]) = lstm(w["wdec"], w["bdec"], st[1], st[2], x)
             ypred = logp(st[1] * w["wsoft"] .+ w["bsoft"], 2)
             ypred = convert(Array{Float32}, ypred)[:]

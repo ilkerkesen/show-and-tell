@@ -1,6 +1,7 @@
 SOS = "<sos>" # start of sentence token
 EOS = "<eos>" # end of sentence token
 UNK = "<unk>" # token for unknown words
+PAD = "<pad>" # padding token
 
 type Vocabulary
     counts # word counts dict
@@ -34,6 +35,7 @@ type Vocabulary
 
         w2i[EOS] = i
         w2i[UNK] = i+1
+        w2i[PAD] = i+2
 
         # build index2word array
         vocabsize = length(values(w2i))

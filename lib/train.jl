@@ -1,40 +1,30 @@
-# one minibatch training
-function train!(w, s, image, captions, opts, o)
+function train!(w, s, images, captions, masks, opts, o)
     values = []
-    gloss = lossgradient(w, copy(s), image, captions; o=o, values=values)
+    gloss = lossgradient(w, copy(s), images, captions, masks; o=o, values=values)
     update!(w, gloss, opts)
     return values
 end
 
-# for testing
 function bulkloss(w, s, o, data, vocab)
     nsamples = length(data)
     ids = [1:nsamples...]
     nbatches = div(nsamples, o[:batchsize])
 
-    total = 0.0
-    nwords = 0
-    newo = Dict(
-        :finetune => get(o, :finetune, false)
-    )
+    total, nwords = 0.0, 0
+    newo = Dict(:finetune => get(o, :finetune, false))
     for i = 1:nbatches
         lower = (i-1)*o[:batchsize]+1
         upper = min(lower+o[:batchsize]-1, nsamples)
         samples = data[ids[lower:upper]]
-        images, captions = make_batch(o, samples, vocab)
+        images, captions, masks = make_batch(o, samples, vocab)
         values = []
-        loss(w, copy(s), images, captions; o=newo, values=values)
+        loss(w, copy(s), images, captions, masks; o=newo, values=values)
         total  += values[1]
         nwords += values[2]
-        images, captions = 0, 0; gc(); flush(STDOUT)
+        images, captions, masks = 0, 0, 0; gc(); flush(STDOUT)
     end
     return total/nwords
 end
-
-# oparams{T<:Number}(::KnetArray{T}; p...)=Adam()
-# oparams{T<:Number}(::Array{T}; p...)=Adam()
-# oparams(a::Associative; p...)=Dict(k=>oparams(v) for (k,v) in a)
-# oparams(a; p...)=map(x->oparams(x;p...), a)
 
 # Training started (nsamples=30000, nbatches=120, loss=Inf, score=0). [2017-03-12T00:57:09.813]
 
