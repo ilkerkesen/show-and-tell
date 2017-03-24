@@ -193,10 +193,6 @@ function main(args)
                 # check and save best model
                 score >= bestscore || continue
 
-                # update score and loss values
-                bestscore = score >= bestscore ? score : bestscore
-                bestloss = lossval <= bestloss ? lossval : bestloss
-
                 path, ext = splitext(abspath(o[:savefile]))
                 filename  = abspath(string(path, "-iter-", iter, ext))
                 savemodel(o, w, opts, filename, score, lossval)
@@ -209,6 +205,7 @@ function main(args)
                     _, _, worst = pop!(checkpoints)
                     rm(worst)
                 end
+                bestscore = checkpoints[end][1]
             end
         end # batches end
 
