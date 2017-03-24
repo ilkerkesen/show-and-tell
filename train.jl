@@ -191,7 +191,7 @@ function main(args)
                 gc()
 
                 # check and save best model
-                score >= bestscore || lossval <= bestloss || continue
+                score >= bestscore || continue
 
                 # update score and loss values
                 bestscore = score >= bestscore ? score : bestscore
@@ -203,10 +203,11 @@ function main(args)
                 @printf("Model saved to %s.\n", filename); flush(STDOUT)
 
                 # keep track of checkpoints
-                push!(checkpoints, filename)
+                push!(checkpoints, (score, -lossval, filename))
+                sort!(checkpoints, rev=true)
                 if length(checkpoints) > o[:checkpoints]
-                    oldest = shift!(checkpoints)
-                    rm(oldest)
+                    _, _, worst = pop!(checkpoints)
+                    rm(worst)
                 end
             end
         end # batches end
