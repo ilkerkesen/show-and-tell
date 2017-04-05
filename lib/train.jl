@@ -11,7 +11,8 @@ function bulkloss(w, s, o, data, vocab)
     nbatches = div(nsamples, o[:batchsize])
 
     total, nwords = 0.0, 0
-    newo = Dict(:finetune => get(o, :finetune, false))
+    newo = Dict(:finetune => get(o, :finetune, false),
+                :atype => get(o, :atype, AutoGrad.getval(typeof(w["wdec"]))))
     for i = 1:nbatches
         lower = (i-1)*o[:batchsize]+1
         upper = min(lower+o[:batchsize]-1, nsamples)

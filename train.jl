@@ -41,7 +41,6 @@ function main(args)
         ("--convnet"; default="vgg19")
         ("--lastlayer"; default="relu7")
         ("--visual"; arg_type=Int; nargs='+'; default=[4096])
-        # ("--featuremaps"; action=:store_true)
         ("--cnnmode"; arg_type=Int; default=1)
 
         # training options
@@ -53,6 +52,8 @@ function main(args)
         ("--seed"; arg_type=Int; default=-1; help="random seed")
         ("--gcheck"; arg_type=Int; default=0; help="gradient checking")
         ("--finetune"; action=:store_true; help="fine tune convnet")
+        ("--optim"; default="Adam"; help="optimizer (Sgd|Adam|Adagrad)")
+        ("--eps"; default=1e-6; help="epsilon for Adagrad optimizer")
         ("--adam"; action=:store_true; help="use adam optimizer")
         ("--decay"; arg_type=Float32; default=Float32(1.0); help="lr decay")
         ("--decayperiod"; arg_type=Int64; default=0)
@@ -126,8 +127,8 @@ function main(args)
     if o[:gcheck] > 0
         ids = shuffle([1:nsamples...])[1:o[:batchsize]]
         images, captions, masks = make_batch(o, train[ids], vocab)
-        gradcheck(
-            loss, w, copy(s), images, captions; gcheck=o[:gcheck], verbose=true)
+        gradcheck(loss, w, copy(s), images, captions, masks;
+                  gcheck=o[:gcheck], verbose=true, atol=0.01)
         images
         gc()
     end
@@ -219,7 +220,7 @@ function main(args)
 end
 
 function decay!(o, opts, lossval, prevloss)
-    if o[:lr] < 1.0 && lossval > prevloss
+    if o[:decay] < 1.0 && lossval > prevloss
         o[:lr] *= o[:decay]
         @printf("\nlr decay. new lr=%g\n", o[:lr]); flush(STDOUT)
         decay!(o[:lr], opts)
@@ -238,7 +239,7 @@ function decay!(lr, opts::Array)
     end
 end
 
-function decay!(lr, opt::Union{Knet.Adam,Knet.Sgd})
+function decay!(lr, opt::Union{Knet.Adam,Knet.Sgd,Knet.Adagrad})
     opt.lr = lr
 end
 
@@ -303,7 +304,7 @@ function get_opts(o,w)
 end
 
 function copy_opts(opt::Knet.Sgd, w, save)
-    Sgd(;lr=opt.lr)
+    Sgd(;lr=opt.lr,gclip=opt.gclip)
 end
 
 function copy_opts(opt::Knet.Adam, w, save)
@@ -315,6 +316,7 @@ function copy_opts(opt::Knet.Adam, w, save)
     optcopy.beta2 = opt.beta2
     optcopy.t = opt.t
     optcopy.eps = opt.eps
+    optcopy.gclip = opt.gclip
 
     # array elements
     if save
@@ -325,6 +327,15 @@ function copy_opts(opt::Knet.Adam, w, save)
         optcopy.scndm = convert(typeof(w), opt.scndm)
     end
 
+    return optcopy
+end
+
+function copy_opts(opt::Knet.Adagrad, w, save)
+    optcopy = Adagrad()
+    optcopy.lr = opt.lr
+    optcopy.eps = opt.eps
+    optcopy.gclip = opt.gclip
+    optcopy.G = opt.G
     return optcopy
 end
 
@@ -353,7 +364,7 @@ function init_opts(o, w::Array)
 end
 
 function init_opts{T<:Number}(o, w::Union{KnetArray{T},Array{T}})
-    (o[:adam] ? Adam : Sgd)(;lr=o[:lr],gclip=o[:gclip])
+    (eval(parse(o[:optim])))(;lr=o[:lr],gclip=o[:gclip])
 end
 
 function copy_weights(w::Dict)
