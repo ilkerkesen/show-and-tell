@@ -49,7 +49,7 @@ end
 
 # generate
 function generate(w, s, vis, vocab; maxlen=20, beamsize=1)
-    atype = typeof(AutoGrad.getval(w["wdec"]))
+    atype = typeof(AutoGrad.getval(w["wdec"])) <: KnetArray ? KnetArray : Array
     wcnn  = get(w, "wcnn", nothing)
     vis = convert(atype, vis)
     if wcnn != nothing

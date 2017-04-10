@@ -6,8 +6,11 @@ using Images
 
 include("lib/vocab.jl")
 include("lib/convnet.jl")
+include("lib/init.jl")
+include("lib/base.jl")
 include("lib/model.jl")
 include("lib/imgproc.jl")
+include("lib/util.jl")
 
 function main(args)
     s = ArgParseSettings()
@@ -32,27 +35,26 @@ function main(args)
     println("Datetime: ", now()); flush(STDOUT)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
+    o[:loadfile] = o[:modelfile]
 
     newsize = tuple(o[:imsize]...)
     rgbmean = reshape(o[:rgbmean], (1,1,3))
 
     # load model
-    atype = o[:nogpu] ? Array{Float32} : KnetArray{Float32}
+    o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     w = load(o[:modelfile], "w")
+    w = convert_weight(o[:atype], w)
     vocab = load(o[:vocabfile], "vocab")
-    w = map(i->convert(atype, i), w)
     lossval = load(o[:modelfile], "lossval")
-    s = initstate(atype, size(w[3], 1), 1)
+    s = initstate(o[:atype], size(w["wsoft"], 1), 1)
 
-    # load cnn
-    wcnn = load(o[:modelfile], "wcnn")
-    if wcnn != nothing
-        wcnn = map(i->convert(atype, i), wcnn)
-    elseif o[:cnnfile] != nothing
+    # load convnet
+    if o[:cnnfile] != nothing
         vggmat = matread(abspath(o[:cnnfile]))
         wcnn = get_vgg_weights(vggmat; last_layer=o[:lastlayer])
+        w["wcnn"] = wcnn
     end
-    wcnn == nothing && error("CNN is a MUST")
+
     @printf("Data and model loaded [%s]\n", now()); flush(STDOUT)
 
     # generate caption
@@ -60,9 +62,9 @@ function main(args)
     @printf("Generation started (loss=%g,date=%s)\n", lossval, ti)
     flush(STDOUT)
     img = load(abspath(o[:image]))
-    img = process_image(img, newsize, rgbmean)
+    img = process_image(img, newsize; rgbmean=rgbmean)
     generated = generate(
-        w, wcnn, copy(s), img, vocab; maxlen=o[:maxlen], beamsize=o[:beamsize])
+        w, copy(s), img, vocab; maxlen=o[:maxlen], beamsize=o[:beamsize])
     report_generation(o[:image], generated, o[:beamsize])
     tf = now()
     @printf("\nTime elapsed: %s [%s]\n", tf-ti, tf)

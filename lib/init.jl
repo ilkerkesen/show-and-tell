@@ -18,15 +18,3 @@ function initweights(o::Dict)
     w["wemb"] = o[:winit]*randn(o[:vocabsize], o[:embed])
     return convert_weight(o[:atype], w)
 end
-
-function convert_weight(atype, w::Dict)
-    Dict(k => convert(atype,v) for (k,v) in w)
-end
-
-function convert_weight(atype, w::Array{Any})
-    map(i->convert(atype,w[i]), [1:length(w)...])
-end
-
-function convert_weight{T<:Number}(atype, w::Array{T})
-    convert(atype, w)
-end
