@@ -1,7 +1,6 @@
-function get_entries(zip, splits)
-    zip = abspath(zip)
-    file = joinpath(splitext(splitdir(abspath(zip))[2])[1], "dataset.json")
-    entries = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
+function get_entries(file, splits)
+    file = abspath(file)
+    entries = JSON.parsefile(file)["images"]
     return map(s->filter(x->x["split"]==s, entries), splits)
 end
 
