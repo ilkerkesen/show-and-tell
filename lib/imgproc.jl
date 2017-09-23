@@ -23,7 +23,7 @@ function process_image(
         a1 = Images.imresize(a1, newsize)
     end
 
-    b1 = permutedims(channelview(a1), (3,2,1))
+    b1 = permutedims(collect(channelview(a1)), (3,2,1))
     colordim = size(b1, 3)
     if colordim != 3
         c1 = convert(Array{Float32}, b1)
