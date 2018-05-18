@@ -38,7 +38,7 @@ function main(args)
         ("--winit"; arg_type=Float32; default=Float32(0.08))
         ("--hidden"; arg_type=Int; default=512)
         ("--embed"; arg_type=Int; default=512)
-        ("--convnet"; default="vgg19")
+        ("--convnet"; default="vgg16")
         ("--lastlayer"; default="relu7")
         ("--visual"; arg_type=Int; nargs='+'; default=[4096])
         ("--cnnmode"; arg_type=Int; default=1)
@@ -66,13 +66,13 @@ function main(args)
         ("--sortbylen"; action=:store_true)
 
         # dropout values
-        ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
-        ("--fc7drop"; arg_type=Float32; default=Float32(0.0))
-        ("--softdrop"; arg_type=Float32; default=Float32(0.0))
-        ("--wembdrop"; arg_type=Float32; default=Float32(0.0))
-        ("--vembdrop"; arg_type=Float32; default=Float32(0.0))
-        ("--membdrop"; arg_type=Float32; default=Float32(0.0))
-        ("--attdrop"; arg_type=Float32; default=Float32(0.0))
+        ("--fc6drop"; arg_type=Float32; default=Float32(0.5))
+        ("--fc7drop"; arg_type=Float32; default=Float32(0.5))
+        ("--softdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--wembdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--vembdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--membdrop"; arg_type=Float32; default=Float32(0.5))
+        ("--attdrop"; arg_type=Float32; default=Float32(0.5))
     end
 
     # parse args
@@ -93,11 +93,10 @@ function main(args)
     # initialize state and weights
     o[:atype] = !o[:nogpu] ? KnetArray{Float32} : Array{Float32}
     prevscore = bestscore =
-        o[:loadfile] == nothing ? 0 : load(o[:loadfile], "score")
+        o[:loadfile] == nothing ? Inf : load(o[:loadfile], "score")
     prevloss = bestloss =
         o[:loadfile] == nothing ? Inf : load(o[:loadfile], "lossval")
-    w = get_weights(o)
-    s = initstate(o[:atype], o[:hidden], o[:batchsize])
+    w, srnn = get_weights(o)
     wcnn =  get_wcnn(o)
     if wcnn != nothing && o[:finetune]
         w["wcnn"] = wcnn
@@ -124,23 +123,23 @@ function main(args)
 
 
     # gradient check
-    if o[:gcheck] > 0
-        ids = shuffle([1:nsamples...])[1:o[:batchsize]]
-        images, captions, masks = make_batch(o, train[ids], vocab)
-        gradcheck(loss, w, copy(s), images, captions, masks;
-                  gcheck=o[:gcheck], verbose=true, atol=0.01)
-        images
-        gc()
-    end
+    # if o[:gcheck] > 0
+    #     ids = shuffle([1:nsamples...])[1:o[:batchsize]]
+    #     images, captions, masks = make_batch(o, train[ids], vocab)
+    #     gradcheck(loss, w, copy(s), images, captions, masks;
+    #               gcheck=o[:gcheck], verbose=true, atol=0.01)
+    #     images
+    #     gc()
+    # end
 
     # checkpoints
     checkpoints = []
 
     # sort sequences
     if o[:sortbylen]
-        sort!(train, by=i->length(i[2]))
+        sort!(train, by=i->length(i[2]), rev=true)
     end
-    sort!(valid, by=i->length(i[2]))
+    sort!(valid, by=i->length(i[2]), rev=true)
     offsets = collect(1:o[:batchsize]:nsamples+1)
 
     # training
@@ -163,27 +162,28 @@ function main(args)
             iter = (epoch-1)*nbatches+i
             lower, upper = offsets[k:k+1]
             samples = train[lower:upper-1]
-            images, captions, masks = make_batch(o, samples, vocab)
+            images, x, y, batchsizes = make_batch(o, samples, vocab)
             this_loss, this_words = train!(
-                w, s, images, captions, masks, opts, o)
+                w, srnn, images, x, y, batchsizes, opts, o)
             flush(STDOUT)
             images = 0; captions = 0; ans = 0; gc()
             losstrn += this_loss
             nwords  += this_words
 
             if iter % saveperiod == 0
-                lossval = bulkloss(w,s,o,valid,vocab)
+                lossval = bulkloss(w,srnn,o,valid,vocab)
                 @printf("\n(epoch/iter): %d/%d, loss: %g/%g [%s] ",
                         epoch, iter, losstrn/nwords, lossval, now())
                 flush(STDOUT)
-                scores, bp, hlen, rlen =
-                    validate(w, val, vocab, o)
-                @printf("\nBLEU = %.1f/%.1f/%.1f/%.1f ",
-                        map(i->i*100,scores)...)
-                @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d) [%s]\n",
-                        bp, hlen/rlen, hlen, rlen, now())
-                flush(STDOUT)
-                score = scores[end]
+                # scores, bp, hlen, rlen =
+                #     validate(w, val, vocab, o)
+                # @printf("\nBLEU = %.1f/%.1f/%.1f/%.1f ",
+                #         map(i->i*100,scores)...)
+                # @printf("(BP=%g, ratio=%g, hyp_len=%d, ref_len=%d) [%s]\n",
+                #         bp, hlen/rlen, hlen, rlen, now())
+                # flush(STDOUT)
+                # score = scores[end]
+                score = lossval
 
                 # learning rate decay
                 decay!(o, opts, lossval, prevloss)
@@ -192,7 +192,7 @@ function main(args)
                 gc()
 
                 # check and save best model
-                score >= bestscore || continue
+                score <= bestscore || continue
 
                 path, ext = splitext(abspath(o[:savefile]))
                 filename  = abspath(string(path, "-iter-", iter, ext))

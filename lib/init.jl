@@ -9,12 +9,10 @@ end
 # initialize all weights of decoder network
 function initweights(o::Dict)
     w = Dict()
-    w["wdec"] = o[:winit]*randn(o[:embed]+o[:hidden], 4*o[:hidden])
-    w["bdec"] = zeros(1, 4*o[:hidden])
-    w["bdec"][1:o[:hidden]] = 1 # forget gate bias
-    w["wsoft"] = o[:winit]*randn(o[:hidden], o[:vocabsize])
-    w["bsoft"] = zeros(1, o[:vocabsize])
-    w["vemb"] = o[:winit]*randn(o[:visual][1], o[:embed])
-    w["wemb"] = o[:winit]*randn(o[:vocabsize], o[:embed])
-    return convert_weight(o[:atype], w)
+    srnn, w["rnn"] = rnninit(o[:embed], o[:hidden])
+    w["wsoft"] = o[:winit]*randn(o[:vocabsize], o[:hidden])
+    w["bsoft"] = zeros(o[:vocabsize], 1)
+    w["vemb"] = o[:winit]*randn(o[:embed], o[:visual][1])
+    w["wemb"] = o[:winit]*randn(o[:embed], o[:vocabsize])
+    return convert_weight(o[:atype], w), srnn
 end

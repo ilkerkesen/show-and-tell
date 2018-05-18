@@ -44,12 +44,13 @@ end
 
 function get_weights(o)
     if o[:loadfile] == nothing
-        w = initweights(o)
+        w, srnn = initweights(o)
     else
         w = load(o[:loadfile], "w")
         w = convert_weight(o[:atype], w)
+        srnn = nothing
     end
-    return w
+    return w, srnn
 end
 
 function get_wcnn(o)

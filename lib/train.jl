@@ -1,25 +1,26 @@
-function train!(w, s, images, captions, masks, opts, o)
+function train!(w, s, images, x, y, batchsizes, opts, o)
     values = []
-    gloss = lossgradient(w, copy(s), images, captions, masks; o=o, values=values)
+    gloss = lossgradient(
+        w, s, images, x, y, batchsizes; o=o, values=values)
     update!(w, gloss, opts)
     return values
 end
 
-function bulkloss(w, s, o, data, vocab)
+function bulkloss(w, srnn, o, data, vocab)
     nsamples = length(data)
     ids = [1:nsamples...]
     nbatches = div(nsamples, o[:batchsize])
 
     total, nwords = 0.0, 0
     newo = Dict(:finetune => get(o, :finetune, false),
-                :atype => get(o, :atype, AutoGrad.getval(typeof(w["wdec"]))))
+                :atype => get(o, :atype, AutoGrad.getval(typeof(w["wsoft"]))))
     for i = 1:nbatches
         lower = (i-1)*o[:batchsize]+1
         upper = min(lower+o[:batchsize]-1, nsamples)
         samples = data[ids[lower:upper]]
-        images, captions, masks = make_batch(o, samples, vocab)
+        images, x, y, batchsizes = make_batch(o, samples, vocab)
         values = []
-        loss(w, copy(s), images, captions, masks; o=newo, values=values)
+        loss(w, srnn, images, x, y, batchsizes; o=newo, values=values)
         total  += values[1]
         nwords += values[2]
         images, captions, masks = 0, 0, 0; gc(); flush(STDOUT)

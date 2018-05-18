@@ -13,7 +13,7 @@ function main(args)
         ("--captions"; help="captions archieve (karpathy)")
         ("--savefile"; help="save file in JLD format")
         ("--cnnfile"; help="CNN model file")
-        ("--convnet"; default="vgg19")
+        ("--convnet"; default="vgg16")
         ("--lastlayer"; default="relu7"; help="layer for feature extraction")
         ("--seed"; arg_type=Int; default=0; help="random seed")
         ("--fc6drop"; arg_type=Float32; default=Float32(0.0))
@@ -61,7 +61,7 @@ function main(args)
                 feats = convnet(weights, KnetArray(image) .- avgimg; o=dict)
                 feats = convert(Array{Float32}, feats)
                 if !featuremaps
-                    feats = reshape(feats, 1, length(feats))
+                    feats = reshape(feats, length(feats), 1)
                 end
                 write(outfile, filename, feats)
 

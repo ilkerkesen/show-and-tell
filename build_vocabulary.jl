@@ -22,9 +22,7 @@ function main(args)
     isa(args, AbstractString) && (args=split(args))
     o = parse_args(args, s; as_symbols=true); println(o); flush(STDOUT)
 
-    zip = abspath(o[:captions])
-    file = joinpath(split(splitdir(zip)[2], ".")[1], "dataset.json")
-    entries = JSON.parse(readstring(`unzip -p $zip $file`))["images"]
+    entries = JSON.parsefile(abspath(o[:captions]))["images"]
     vocabulary_splits = ["train"]
     extradata = false
     if o[:dataset] == "coco" && o[:extradata]

@@ -1,13 +1,12 @@
 # loss functions
-function loss(w, s, visual, captions, masks; o=Dict(), values=[])
+function loss(w, srnn, visual, x, y, batchsizes; o=Dict(), values=[])
     finetune = get(o, :finetune, false)
-    atype = typeof(AutoGrad.getval(w["wdec"]))
+    atype = typeof(AutoGrad.getval(w["wsoft"]))
     visual = convert(atype, visual)
     if finetune && haskey(w, "wcnn")
-        visual = vgg19(w["wcnn"], visual; o=o)
-        visual = transpose(visual)
+        visual = vgg16(w["wcnn"], visual; o=o)
     end
-    lossval, nwords = decoder(w, s, visual, captions, masks; o=o)
+    lossval, nwords = decoder(w, srnn, visual, x, y, batchsizes; o=o)
     push!(values, AutoGrad.getval(lossval), AutoGrad.getval(nwords))
     return lossval/nwords
 end
@@ -16,9 +15,8 @@ end
 lossgradient = grad(loss)
 
 # loss function for decoder network
-function decoder(w, s, vis, seq, masks; o=Dict())
-    total, count = 0, 0
-    atype = typeof(AutoGrad.getval(w["wdec"]))
+function decoder(w, srnn, vis, x, y, batchsizes=nothing; o=Dict())
+    atype = typeof(AutoGrad.getval(w["wsoft"]))
 
     # set dropouts
     vembdrop = get(o, :vembdrop, 0.0)
@@ -28,23 +26,16 @@ function decoder(w, s, vis, seq, masks; o=Dict())
 
     # visual features
     vis = dropout(vis, fc7drop)
-    x = vis * w["vemb"]
-    x = dropout(x, vembdrop)
+    vemb = w["vemb"] * vis
+    vemb = dropout(vemb, vembdrop)
 
-    # feed LSTM with visual embeddings
-    (s[1], s[2]) = lstm(w["wdec"], w["bdec"], s[1], s[2], x)
-
-    # textual features
-    for t in 1:length(seq)-1
-        x = w["wemb"][seq[t],:]
-        x = dropout(x, wembdrop)
-        (s[1], s[2]) = lstm(w["wdec"], w["bdec"], s[1], s[2], x)
-        ypred = dropout(s[1], softdrop) * w["wsoft"] .+ w["bsoft"]
-        total += logprob(seq[t+1], ypred, masks[t])
-        count += sum(masks[t])
-    end
-
-    return (-total,count)
+    wemb = w["wemb"][:,x]
+    y1, h1, c1 = rnnforw(srnn, w["rnn"], vemb; hy=true, cy=true)
+    yy, hy = rnnforw(srnn, w["rnn"], wemb, h1, c1; batchSizes=batchsizes, hy=true)
+    y2 = reshape(yy,size(yy,1),size(yy,2)*size(yy,3))
+    ypred = w["wsoft"] * dropout(y2, softdrop) .+ w["bsoft"]
+    # @show size(ypred), size(y)
+    nll(ypred, y; average=false), length(y)
 end
 
 # generate

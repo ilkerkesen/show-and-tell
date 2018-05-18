@@ -7,47 +7,47 @@ function vgg16(w, x; o=Dict())
     featuremaps = get(o, :featuremaps, false)
 
     conv1_1 = conv4(w[1], x; padding=1, mode=mode) .+ w[2]
-    conv1_1 = relu(conv1_1)
+    conv1_1 = relu.(conv1_1)
     conv1_2 = conv4(w[3], conv1_1; padding=1, mode=mode) .+ w[4]
-    conv1_2 = relu(conv1_2)
+    conv1_2 = relu.(conv1_2)
     pool1   = pool(conv1_2)
 
     conv2_1 = conv4(w[5], pool1; padding=1, mode=mode) .+ w[6]
-    conv2_1 = relu(conv2_1)
+    conv2_1 = relu.(conv2_1)
     conv2_2 = conv4(w[7], conv2_1; padding=1, mode=mode) .+ w[8]
-    conv2_2 = relu(conv2_2)
+    conv2_2 = relu.(conv2_2)
     pool2   = pool(conv2_2)
 
     conv3_1 = conv4(w[9], pool2; padding=1, mode=mode) .+ w[10]
-    conv3_1 = relu(conv3_1)
+    conv3_1 = relu.(conv3_1)
     conv3_2 = conv4(w[11], conv3_1; padding=1, mode=mode) .+ w[12]
-    conv3_2 = relu(conv3_2)
+    conv3_2 = relu.(conv3_2)
     conv3_3 = conv4(w[13], conv3_2; padding=1, mode=mode) .+ w[14]
-    conv3_3 = relu(conv3_3)
+    conv3_3 = relu.(conv3_3)
     pool3   = pool(conv3_3)
 
     conv4_1 = conv4(w[15], pool3; padding=1, mode=mode) .+ w[16]
-    conv4_1 = relu(conv4_1)
+    conv4_1 = relu.(conv4_1)
     conv4_2 = conv4(w[17], conv4_1; padding=1, mode=mode) .+ w[18]
-    conv4_2 = relu(conv4_2)
+    conv4_2 = relu.(conv4_2)
     conv4_3 = conv4(w[19], conv4_2; padding=1, mode=mode) .+ w[20]
-    conv4_3 = relu(conv4_3)
+    conv4_3 = relu.(conv4_3)
     pool4   = pool(conv4_3)
 
     conv5_1 = conv4(w[21], pool4; padding=1, mode=mode) .+ w[22]
-    conv5_1 = relu(conv5_1)
+    conv5_1 = relu.(conv5_1)
     conv5_2 = conv4(w[23], conv5_1; padding=1, mode=mode) .+ w[24]
-    conv5_2 = relu(conv5_2)
+    conv5_2 = relu.(conv5_2)
     conv5_3 = conv4(w[25], conv5_2; padding=1, mode=mode) .+ w[26]
-    conv5_3 = relu(conv5_3)
+    conv5_3 = relu.(conv5_3)
 
     if !featuremaps
         pool5 = pool(conv5_3)
         fc6 = w[27] * mat(pool5) .+ w[28]
-        fc6 = relu(fc6)
+        fc6 = relu.(fc6)
         fc6 = dropout(fc6, fc6drop)
         fc7 = w[29] * mat(fc6) .+ w[30]
-        fc7 = relu(fc7)
+        fc7 = relu.(fc7)
     end
 end
 
@@ -60,60 +60,60 @@ function vgg19(w, x; o=Dict())
     featuremaps = get(o, :featuremaps, false)
 
     conv1_1 = conv4(w[1], x; padding=1, mode=mode) .+ w[2]
-    conv1_1 = relu(conv1_1)
+    conv1_1 = relu.(conv1_1)
     conv1_2 = conv4(w[3], conv1_1; padding=1, mode=mode) .+ w[4]
-    conv1_2 = relu(conv1_2)
+    conv1_2 = relu.(conv1_2)
     pool1   = pool(conv1_2)
 
     conv2_1 = conv4(w[5], pool1; padding=1, mode=mode) .+ w[6]
-    conv2_1 = relu(conv2_1)
+    conv2_1 = relu.(conv2_1)
     conv2_2 = conv4(w[7], conv2_1; padding=1, mode=mode) .+ w[8]
-    conv2_2 = relu(conv2_2)
+    conv2_2 = relu.(conv2_2)
     pool2   = pool(conv2_2)
 
     conv3_1 = conv4(w[9], pool2; padding=1, mode=mode) .+ w[10]
-    conv3_1 = relu(conv3_1)
+    conv3_1 = relu.(conv3_1)
     conv3_2 = conv4(w[11], conv3_1; padding=1, mode=mode) .+ w[12]
-    conv3_2 = relu(conv3_2)
+    conv3_2 = relu.(conv3_2)
     conv3_3 = conv4(w[13], conv3_2; padding=1, mode=mode) .+ w[14]
-    conv3_3 = relu(conv3_3)
+    conv3_3 = relu.(conv3_3)
     conv3_4 = conv4(w[15], conv3_3; padding=1, mode=mode) .+ w[16]
-    conv3_4 = relu(conv3_4)
+    conv3_4 = relu.(conv3_4)
     pool3   = pool(conv3_4)
 
     conv4_1 = conv4(w[17], pool3; padding=1, mode=mode) .+ w[18]
-    conv4_1 = relu(conv4_1)
+    conv4_1 = relu.(conv4_1)
     conv4_2 = conv4(w[19], conv4_1; padding=1, mode=mode) .+ w[20]
-    conv4_2 = relu(conv4_2)
+    conv4_2 = relu.(conv4_2)
     conv4_3 = conv4(w[21], conv4_2; padding=1, mode=mode) .+ w[22]
-    conv4_3 = relu(conv4_3)
+    conv4_3 = relu.(conv4_3)
     conv4_4 = conv4(w[23], conv4_3; padding=1, mode=mode) .+ w[24]
-    conv4_4 = relu(conv4_4)
+    conv4_4 = relu.(conv4_4)
     pool4   = pool(conv4_4)
 
     conv5_1 = conv4(w[25], pool4; padding=1, mode=mode) .+ w[26]
-    conv5_1 = relu(conv5_1)
+    conv5_1 = relu.(conv5_1)
     conv5_2 = conv4(w[27], conv5_1; padding=1, mode=mode) .+ w[28]
-    conv5_2 = relu(conv5_2)
+    conv5_2 = relu.(conv5_2)
     conv5_3 = conv4(w[29], conv5_2; padding=1, mode=mode) .+ w[30]
-    conv5_3 = relu(conv5_3)
+    conv5_3 = relu.(conv5_3)
     conv5_4 = conv4(w[31], conv5_3; padding=1, mode=mode) .+ w[32]
-    conv5_4 = relu(conv5_4)
+    conv5_4 = relu.(conv5_4)
 
     if !featuremaps
         pool5 = pool(conv5_4)
         fc6 = w[33] * mat(pool5) .+ w[34]
-        fc6 = relu(fc6)
+        fc6 = relu.(fc6)
         fc6 = dropout(fc6, fc6drop)
         fc7 = w[35] * mat(fc6) .+ w[36]
-        fc7 = relu(fc7)
+        fc7 = relu.(fc7)
         return fc7
     end
 
     return conv5_4
 end
 
-function get_vgg_weights(vggmat; last_layer="relu7")
+function get_vgg_weights(vggmat; last_layer="relu.7")
     ws = []
     for l in vggmat["layers"]
         if haskey(l, "weights") && length(l["weights"]) != 0
@@ -210,7 +210,7 @@ function reslayerx0(w,x,ms; padding=0, stride=1, mode=1)
 end
 
 function reslayerx1(w,x,ms; padding=0, stride=1, mode=1)
-    relu(reslayerx0(w,x,ms; padding=padding, stride=stride, mode=mode))
+    relu.(reslayerx0(w,x,ms; padding=padding, stride=stride, mode=mode))
 end
 
 function reslayerx2(w,x,ms; pads=[0,1,0], strides=[1,1,1], mode=1)
@@ -222,11 +222,11 @@ end
 function reslayerx3(w,x,ms; pads=[0,0,1,0], strides=[2,2,1,1], mode=1) # 12
     a = reslayerx0(w[1:3],x,ms; stride=strides[1], padding=pads[1], mode=mode)
     b = reslayerx2(w[4:12],x,ms; strides=strides[2:4], pads=pads[2:4], mode=mode)
-    relu(a .+ b)
+    relu.(a .+ b)
 end
 
 function reslayerx4(w,x,ms; pads=[0,1,0], strides=[1,1,1], mode=1)
-    relu(x .+ reslayerx2(w,x,ms; pads=pads, strides=strides, mode=mode))
+    relu.(x .+ reslayerx2(w,x,ms; pads=pads, strides=strides, mode=mode))
 end
 
 function reslayerx5(w,x,ms; strides=[2,2,1,1], mode=1)
